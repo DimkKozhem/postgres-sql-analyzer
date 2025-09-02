@@ -5,10 +5,14 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
-from .database import DatabaseConnection, MockDatabaseConnection
-from .plan_parser import PlanParser, SQLValidator, QueryMetrics
-from .recommendations import RecommendationEngine, Recommendation
-from .config import get_default_config
+from app.database import DatabaseConnection, MockDatabaseConnection
+from app.plan_parser import PlanParser, SQLValidator, QueryMetrics
+from app.recommendations import RecommendationEngine, Recommendation
+from app.config import get_default_config
+from app.validators import validate_config, SQLValidator as ImprovedSQLValidator, InputSanitizer
+from app.exceptions import SQLAnalyzerError, ValidationError, SQLExecutionError, ErrorContext
+from app.logging_config import get_logger, log_sql_query, LoggingContext
+from app.metrics import record_query_metric
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,20 @@ class SQLAnalyzer:
         self.dsn = dsn
         self.mock_mode = mock_mode
         
+        # Загружаем и валидируем конфигурацию
+        self.config = get_default_config()
+        if config:
+            self.config.update(config)
+        
+        # Валидируем конфигурацию
+        validation_result = validate_config(self.config)
+        if not validation_result.is_valid:
+            raise ValidationError(
+                "Ошибка валидации конфигурации",
+                validation_result.errors,
+                validation_result.warnings
+            )
+        
         # Инициализируем компоненты
         if mock_mode or not dsn:
             self.db_connection = MockDatabaseConnection()
@@ -43,19 +61,13 @@ class SQLAnalyzer:
         self.plan_parser = PlanParser()
         self.recommendation_engine = RecommendationEngine()
         self.sql_validator = SQLValidator()
-        
-        # Загружаем конфигурацию по умолчанию
-        self.config = get_default_config()
-        
-        # Обновляем конфигурацию если передана
-        if config:
-            self.config.update(config)
+        self.improved_sql_validator = ImprovedSQLValidator()
         
         # Инициализируем LLM интеграцию если включена
         self.llm_integration = None
         if self.config.get('enable_ai_recommendations'):
             try:
-                from .llm_integration import LLMIntegration
+                from app.llm_integration import LLMIntegration
                 self.llm_integration = LLMIntegration(self.config)
                 logger.info("LLM интеграция инициализирована")
             except ImportError as e:
@@ -66,48 +78,81 @@ class SQLAnalyzer:
     def analyze_sql(self, sql: str, custom_config: Optional[Dict[str, Any]] = None) -> AnalysisResult:
         """Анализирует SQL-запрос и возвращает результат анализа."""
         import time
-        start_time = time.time()
         
-        # Обновляем конфигурацию
-        if custom_config:
-            self.config.update(custom_config)
-        
-        # Валидируем SQL
-        is_valid, validation_errors = self.sql_validator.validate_sql(sql)
-        
-        explain_json = None
-        plan_summary = None
-        metrics = None
-        recommendations = []
-        
-        if is_valid:
-            try:
-                # Получаем EXPLAIN JSON
-                explain_json = self.db_connection.execute_explain(sql)
-                
-                if explain_json:
-                    # Парсим план
-                    plan = self.plan_parser.parse_explain_json(explain_json)
-                    
-                    # Получаем сводку плана
-                    plan_summary = self.plan_parser.get_plan_summary(plan)
-                    
-                    # Вычисляем метрики
-                    metrics = self.plan_parser.calculate_metrics(plan, self.config)
-                    
-                    # Генерируем рекомендации
-                    recommendations = self.recommendation_engine.analyze_plan(
-                        explain_json, 
-                        metrics.__dict__, 
-                        self.config
+        with LoggingContext(logger, "SQL Analysis", sql_length=len(sql)):
+            start_time = time.time()
+            
+            # Санитизируем входные данные
+            sql = InputSanitizer.sanitize_sql(sql)
+            
+            # Обновляем конфигурацию
+            if custom_config:
+                validation_result = validate_config(custom_config)
+                if not validation_result.is_valid:
+                    raise ValidationError(
+                        "Ошибка валидации пользовательской конфигурации",
+                        validation_result.errors,
+                        validation_result.warnings
                     )
-                
-            except Exception as e:
-                logger.error(f"Ошибка анализа SQL: {e}")
-                validation_errors.append(f"Ошибка анализа: {str(e)}")
-                is_valid = False
+                self.config.update(custom_config)
+            
+            # Улучшенная валидация SQL
+            safety_result = self.improved_sql_validator.validate_sql_safety(sql)
+            syntax_result = self.improved_sql_validator.validate_sql_syntax(sql)
+            
+            # Объединяем результаты валидации
+            validation_errors = []
+            validation_errors.extend(safety_result.errors)
+            validation_errors.extend(syntax_result.errors)
+            
+            # Базовая валидация (для совместимости)
+            is_valid_basic, basic_errors = self.sql_validator.validate_sql(sql)
+            validation_errors.extend(basic_errors)
+            
+            is_valid = len(validation_errors) == 0
         
-        analysis_time = time.time() - start_time
+            explain_json = None
+            plan_summary = None
+            metrics = None
+            recommendations = []
+            
+            if is_valid:
+                try:
+                    with ErrorContext("EXPLAIN execution") as ctx:
+                        # Получаем EXPLAIN JSON
+                        explain_json = self.db_connection.execute_explain(sql)
+                        
+                        if explain_json:
+                            # Парсим план
+                            plan = self.plan_parser.parse_explain_json(explain_json)
+                            
+                            # Получаем сводку плана
+                            plan_summary = self.plan_parser.get_plan_summary(plan)
+                            
+                            # Вычисляем метрики
+                            metrics = self.plan_parser.calculate_metrics(plan, self.config)
+                            
+                            # Генерируем рекомендации
+                            recommendations = self.recommendation_engine.analyze_plan(
+                                explain_json, 
+                                metrics.__dict__, 
+                                self.config
+                            )
+                    
+                except Exception as e:
+                    execution_time = time.time() - start_time
+                    log_sql_query(logger, sql, execution_time, success=False, error=str(e))
+                    raise SQLExecutionError(f"Ошибка анализа SQL: {str(e)}", sql, e)
+            
+            analysis_time = time.time() - start_time
+            
+            # Логируем успешный анализ
+            log_sql_query(logger, sql, analysis_time, success=True)
+            
+            # Записываем метрики
+            is_slow = analysis_time > self.config.get('slow_query_threshold', 100.0) / 1000.0
+            is_expensive = metrics and metrics.total_cost > self.config.get('expensive_query_threshold', 1000.0)
+            record_query_metric(analysis_time, success=True, is_slow=is_slow, is_expensive=is_expensive)
         
         # Получаем AI-рекомендации если включены
         ai_recommendations = []

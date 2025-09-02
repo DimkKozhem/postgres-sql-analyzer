@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .analyzer import SQLAnalyzer
+from app.analyzer import SQLAnalyzer
 
 
 @click.group()
@@ -236,7 +236,7 @@ def config():
     """Показывает текущую конфигурацию по умолчанию."""
     
     try:
-        from .config import get_default_config
+        from app.config import get_default_config
         
         config_data = get_default_config()
         

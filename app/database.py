@@ -9,7 +9,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import connection
 
-from .config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

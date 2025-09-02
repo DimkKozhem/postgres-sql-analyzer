@@ -170,7 +170,7 @@ def main():
             dsn = f"postgresql://{username}:{password}@{host}:{port}/{database}"
             
             # Кнопка тестирования подключения
-            if st.button("🔍 Тестировать подключение", use_container_width=True):
+            if st.button("🔍 Тестировать подключение", width='stretch'):
                 with st.spinner("🔍 Тестирую подключение к базе данных..."):
                     success, message = test_database_connection(dsn)
                     if success:
@@ -250,7 +250,7 @@ def main():
         )
         
         # Кнопка применения настроек
-        if st.button("🔄 Применить настройки", use_container_width=True):
+        if st.button("🔄 Применить настройки", width='stretch'):
             st.success("✅ Настройки применены!")
             time.sleep(1)
             st.rerun()
@@ -400,10 +400,11 @@ def main():
             st.info("**LLM:** Отключен")
     
     # Основной контент с вкладками
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📝 Анализ SQL", 
         "📊 Статистика", 
         "📋 Примеры", 
+        "📊 Мониторинг",
         "🔍 Планы выполнения",
         "ℹ️ Справка"
     ])
@@ -437,9 +438,12 @@ def main():
         )
     
     with tab4:
-        show_execution_plans_tab(dsn, mock_mode)
+        show_monitoring_tab()
     
     with tab5:
+        show_execution_plans_tab(dsn, mock_mode)
+    
+    with tab6:
         show_help_tab()
 
 
@@ -486,7 +490,7 @@ def show_sql_analysis_tab(dsn, mock_mode, work_mem, shared_buffers, effective_ca
         analyze_button = st.button(
             "🔍 Анализировать SQL", 
             type="primary",
-            use_container_width=True,
+            width="stretch",
             disabled=not sql_input.strip() or (not mock_mode and not dsn)
         )
     
@@ -700,7 +704,7 @@ def display_analysis_results(result, analyzer):
             data=json_report,
             file_name=f"sql_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
-            use_container_width=True
+            width="stretch"
         )
     
     with col2:
@@ -711,7 +715,7 @@ def display_analysis_results(result, analyzer):
             data=text_report,
             file_name=f"sql_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
             mime="text/plain",
-            use_container_width=True
+            width="stretch"
         )
     
     with col3:
@@ -722,7 +726,7 @@ def display_analysis_results(result, analyzer):
                 data=json.dumps(result.explain_json, indent=2),
                 file_name=f"explain_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
     
     with col4:
@@ -732,7 +736,7 @@ def display_analysis_results(result, analyzer):
             data="PDF content would go here",
             file_name=f"sql_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mime="application/pdf",
-            use_container_width=True,
+            width="stretch",
             disabled=True,
             help="PDF экспорт в разработке"
         )
@@ -802,13 +806,13 @@ def create_plan_visualization(explain_json):
                 yaxis_title="Стоимость (cost)"
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             
             # Дополнительная информация о плане
             st.markdown("### 📊 Детали плана")
             st.dataframe(
                 df[['level', 'type', 'cost', 'rows', 'width']].sort_values('level'),
-                use_container_width=True
+                width="stretch"
             )
             
     except Exception as e:
@@ -890,13 +894,13 @@ def show_statistics_tab(dsn, mock_mode):
                 color_continuous_scale='Reds'
             )
             fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             
             # Детальная таблица
             st.markdown("## 📋 Детальная статистика")
             st.dataframe(
                 df[['query', 'calls', 'total_time', 'mean_time', 'rows']].head(20),
-                use_container_width=True
+                width="stretch"
             )
             
         else:
@@ -1021,7 +1025,7 @@ def show_execution_plans_tab(dsn, mock_mode):
         help="Скопируйте результат команды EXPLAIN (FORMAT JSON)"
     )
     
-    if st.button("🔍 Анализировать план", use_container_width=True):
+    if st.button("🔍 Анализировать план", width="stretch"):
         if plan_json.strip():
             try:
                 plan_data = json.loads(plan_json)
@@ -1048,6 +1052,278 @@ def show_execution_plans_tab(dsn, mock_mode):
                 st.error(f"❌ Ошибка анализа плана: {e}")
         else:
             st.warning("⚠️ Введите план для анализа")
+
+
+def show_monitoring_tab():
+    """Показывает вкладку мониторинга и метрик."""
+    st.markdown("## 📊 Мониторинг и метрики")
+    
+    # Импортируем модули мониторинга
+    try:
+        from app.health import get_health_status
+        from app.metrics import get_metrics_summary, export_prometheus_metrics
+        from app.backup import backup_manager
+        
+        # Получаем текущую конфигурацию
+        config = get_default_config()
+        
+        # Вкладки мониторинга
+        tab1, tab2, tab3, tab4 = st.tabs(["🏥 Health Check", "📈 Метрики", "💾 Backup", "⚙️ Система"])
+        
+        with tab1:
+            st.markdown("### 🏥 Проверка здоровья системы")
+            
+            if st.button("🔍 Проверить здоровье системы", width='stretch'):
+                with st.spinner("🔍 Проверяю здоровье системы..."):
+                    try:
+                        health_status = get_health_status(config)
+                        
+                        # Общий статус
+                        status_color = {
+                            "healthy": "🟢",
+                            "degraded": "🟡", 
+                            "unhealthy": "🔴"
+                        }.get(health_status.get("status", "unknown"), "⚪")
+                        
+                        st.markdown(f"**Общий статус:** {status_color} {health_status.get('status', 'unknown').upper()}")
+                        
+                        # Детали проверок
+                        st.markdown("#### 📋 Детали проверок:")
+                        for check in health_status.get("checks", []):
+                            check_color = {
+                                "healthy": "🟢",
+                                "degraded": "🟡",
+                                "unhealthy": "🔴"
+                            }.get(check.get("status", "unknown"), "⚪")
+                            
+                            with st.expander(f"{check_color} {check.get('name', 'Unknown')}"):
+                                st.markdown(f"**Статус:** {check.get('status', 'unknown')}")
+                                st.markdown(f"**Сообщение:** {check.get('message', 'No message')}")
+                                st.markdown(f"**Время ответа:** {check.get('response_time', 0):.3f}s")
+                                
+                                if check.get("details"):
+                                    st.markdown("**Детали:**")
+                                    st.json(check.get("details"))
+                        
+                        # Системные метрики
+                        if health_status.get("system_metrics"):
+                            st.markdown("#### 💻 Системные метрики:")
+                            metrics = health_status["system_metrics"]
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("CPU", f"{metrics.get('cpu_percent', 0):.1f}%")
+                            with col2:
+                                st.metric("Память", f"{metrics.get('memory_percent', 0):.1f}%")
+                            with col3:
+                                st.metric("Диск", f"{metrics.get('disk_percent', 0):.1f}%")
+                        
+                        # Время работы
+                        uptime = health_status.get("uptime", 0)
+                        st.markdown(f"**⏱️ Время работы:** {uptime:.1f} секунд")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Ошибка проверки здоровья: {e}")
+        
+        with tab2:
+            st.markdown("### 📈 Метрики производительности")
+            
+            if st.button("📊 Обновить метрики", width='stretch'):
+                with st.spinner("📊 Обновляю метрики..."):
+                    try:
+                        metrics_summary = get_metrics_summary()
+                        
+                        # Основные метрики
+                        st.markdown("#### 🎯 Основные метрики:")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Всего запросов", metrics_summary.get("query_metrics", {}).get("total_queries", 0))
+                        with col2:
+                            success_rate = metrics_summary.get("query_metrics", {}).get("success_rate", 0)
+                            st.metric("Успешность", f"{success_rate:.1f}%")
+                        with col3:
+                            avg_time = metrics_summary.get("query_metrics", {}).get("avg_execution_time", 0)
+                            st.metric("Среднее время", f"{avg_time:.3f}s")
+                        
+                        # Детальные метрики запросов
+                        query_metrics = metrics_summary.get("query_metrics", {})
+                        st.markdown("#### 📊 Метрики SQL запросов:")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Успешных", query_metrics.get("successful_queries", 0))
+                        with col2:
+                            st.metric("Неудачных", query_metrics.get("failed_queries", 0))
+                        with col3:
+                            st.metric("Медленных", query_metrics.get("slow_queries", 0))
+                        with col4:
+                            st.metric("Дорогих", query_metrics.get("expensive_queries", 0))
+                        
+                        # LLM метрики
+                        if metrics_summary.get("llm_metrics"):
+                            st.markdown("#### 🤖 LLM метрики:")
+                            llm_metrics = metrics_summary["llm_metrics"]
+                            
+                            for key, value in llm_metrics.items():
+                                if value > 0:
+                                    st.markdown(f"**{key}:** {value}")
+                        
+                        # Экспорт метрик
+                        st.markdown("#### 📤 Экспорт метрик:")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("📊 Prometheus формат"):
+                                prometheus_metrics = export_prometheus_metrics()
+                                st.code(prometheus_metrics, language="text")
+                        
+                        with col2:
+                            if st.button("📄 JSON формат"):
+                                st.json(metrics_summary)
+                        
+                    except Exception as e:
+                        st.error(f"❌ Ошибка получения метрик: {e}")
+        
+        with tab3:
+            st.markdown("### 💾 Управление backup")
+            
+            # Создание backup
+            st.markdown("#### 📦 Создание backup:")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("⚙️ Backup конфигурации"):
+                    try:
+                        backup_path = backup_manager.create_config_backup(config)
+                        st.success(f"✅ Конфигурация сохранена в {backup_path}")
+                    except Exception as e:
+                        st.error(f"❌ Ошибка создания backup: {e}")
+            
+            with col2:
+                if st.button("📁 Backup данных"):
+                    try:
+                        backup_path = backup_manager.create_data_backup()
+                        if backup_path:
+                            st.success(f"✅ Данные сохранены в {backup_path}")
+                        else:
+                            st.warning("⚠️ Директория данных не найдена")
+                    except Exception as e:
+                        st.error(f"❌ Ошибка создания backup: {e}")
+            
+            with col3:
+                if st.button("🚀 Полный backup"):
+                    try:
+                        backup_path = backup_manager.create_full_backup(config)
+                        st.success(f"✅ Полный backup создан: {backup_path}")
+                    except Exception as e:
+                        st.error(f"❌ Ошибка создания backup: {e}")
+            
+            # Список backup
+            st.markdown("#### 📋 Список доступных backup:")
+            
+            if st.button("🔄 Обновить список"):
+                try:
+                    backups = backup_manager.list_backups()
+                    
+                    if backups:
+                        for backup in backups:
+                            with st.expander(f"📦 {backup['filename']} ({backup['type']})"):
+                                st.markdown(f"**Тип:** {backup['type']}")
+                                st.markdown(f"**Размер:** {backup['size']} байт")
+                                st.markdown(f"**Создан:** {backup['created']}")
+                                st.markdown(f"**Путь:** {backup['path']}")
+                    else:
+                        st.info("📭 Backup файлы не найдены")
+                        
+                except Exception as e:
+                    st.error(f"❌ Ошибка получения списка backup: {e}")
+            
+            # Статистика backup
+            st.markdown("#### 📊 Статистика backup:")
+            
+            if st.button("📈 Показать статистику"):
+                try:
+                    stats = backup_manager.get_backup_stats()
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Всего backup", stats.get("total_backups", 0))
+                    with col2:
+                        st.metric("Общий размер", f"{stats.get('total_size_mb', 0)} MB")
+                    with col3:
+                        st.metric("Директория", stats.get("backup_dir", "N/A"))
+                        
+                except Exception as e:
+                    st.error(f"❌ Ошибка получения статистики: {e}")
+            
+            # Очистка старых backup
+            st.markdown("#### 🧹 Очистка старых backup:")
+            
+            days_to_keep = st.slider("Дней для хранения", 1, 365, 30)
+            
+            if st.button("🗑️ Очистить старые backup"):
+                try:
+                    deleted_count = backup_manager.cleanup_old_backups(days_to_keep)
+                    st.success(f"✅ Удалено {deleted_count} старых backup файлов")
+                except Exception as e:
+                    st.error(f"❌ Ошибка очистки: {e}")
+        
+        with tab4:
+            st.markdown("### ⚙️ Системная информация")
+            
+            # Информация о системе
+            st.markdown("#### 💻 Система:")
+            
+            try:
+                import platform
+                import psutil
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**ОС:** {platform.system()} {platform.release()}")
+                    st.markdown(f"**Python:** {platform.python_version()}")
+                    st.markdown(f"**Архитектура:** {platform.machine()}")
+                
+                with col2:
+                    st.markdown(f"**Процессор:** {platform.processor()}")
+                    st.markdown(f"**Память:** {psutil.virtual_memory().total // (1024**3)} GB")
+                    st.markdown(f"**Диск:** {psutil.disk_usage('/').total // (1024**3)} GB")
+                
+                # Использование ресурсов
+                st.markdown("#### 📊 Использование ресурсов:")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    cpu_percent = psutil.cpu_percent(interval=1)
+                    st.metric("CPU", f"{cpu_percent:.1f}%")
+                
+                with col2:
+                    memory = psutil.virtual_memory()
+                    st.metric("Память", f"{memory.percent:.1f}%")
+                
+                with col3:
+                    disk = psutil.disk_usage('/')
+                    st.metric("Диск", f"{disk.percent:.1f}%")
+                
+                # Сетевые интерфейсы
+                st.markdown("#### 🌐 Сетевые интерфейсы:")
+                
+                try:
+                    network_interfaces = psutil.net_if_addrs()
+                    for interface, addresses in network_interfaces.items():
+                        with st.expander(f"🔌 {interface}"):
+                            for addr in addresses:
+                                st.markdown(f"**{addr.family.name}:** {addr.address}")
+                except Exception as e:
+                    st.warning(f"⚠️ Не удалось получить сетевую информацию: {e}")
+                    
+            except Exception as e:
+                st.error(f"❌ Ошибка получения системной информации: {e}")
+    
+    except ImportError as e:
+        st.error(f"❌ Модули мониторинга недоступны: {e}")
+        st.info("💡 Установите дополнительные зависимости: `pip install psutil`")
 
 
 def show_help_tab():
