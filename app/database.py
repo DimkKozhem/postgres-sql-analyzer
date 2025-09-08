@@ -5,11 +5,11 @@ import logging
 from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2.extensions import connection
+import psycopg2  # type: ignore
+from psycopg2.extras import RealDictCursor  # type: ignore
+from psycopg2.extensions import connection  # type: ignore
 
-from .config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ class DatabaseConnection:
                         SELECT 
                             query,
                             calls,
-                            total_time,
-                            mean_time,
+                            total_exec_time,
+                            mean_exec_time,
                             rows,
                             shared_blks_hit,
                             shared_blks_read,
@@ -80,10 +80,10 @@ class DatabaseConnection:
                             shared_blks_dirtied,
                             temp_blks_read,
                             temp_blks_written,
-                            blk_read_time,
-                            blk_write_time
+                            shared_blk_read_time,
+                            shared_blk_write_time
                         FROM pg_stat_statements 
-                        ORDER BY total_time DESC 
+                        ORDER BY total_exec_time DESC 
                         LIMIT %s
                     """, (limit,))
                     

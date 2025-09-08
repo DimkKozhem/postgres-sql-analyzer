@@ -4,12 +4,47 @@ import os
 import subprocess
 import time
 import logging
+import socket
 from typing import Optional, Tuple
 from contextlib import contextmanager
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _is_port_available(port: int) -> bool:
+    """Проверяет, свободен ли порт."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('localhost', port))
+            return True
+    except OSError:
+        return False
+
+
+def _kill_process_on_port(port: int) -> bool:
+    """Убивает процесс, занимающий порт."""
+    try:
+        # Находим процесс, занимающий порт
+        result = subprocess.run(
+            ['lsof', '-ti', f':{port}'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            for pid in pids:
+                if pid.strip():
+                    subprocess.run(['kill', '-9', pid.strip()], timeout=5)
+                    logger.info(f"Убит процесс {pid} на порту {port}")
+            return True
+    except Exception as e:
+        logger.warning(f"Не удалось освободить порт {port}: {e}")
+    
+    return False
 
 
 class SSHTunnel:
@@ -46,6 +81,15 @@ class SSHTunnel:
             ]
             
             logger.info(f"Создание SSH туннеля: {ssh_user}@{ssh_host} -> localhost:{local_port}")
+            
+            # Проверяем, свободен ли порт
+            if not _is_port_available(local_port):
+                logger.warning(f"Порт {local_port} занят, пытаемся освободить...")
+                _kill_process_on_port(local_port)
+                time.sleep(1)  # Ждем освобождения порта
+                
+                if not _is_port_available(local_port):
+                    raise RuntimeError(f"Не удалось освободить порт {local_port}")
             
             # Запускаем SSH туннель в фоновом режиме
             self.tunnel_process = subprocess.Popen(
@@ -110,7 +154,7 @@ def ssh_tunnel_context():
         if settings.AUTO_CREATE_SSH_TUNNEL and settings.SSH_HOST:
             if ssh_tunnel.create_tunnel(
                 remote_host='localhost',  # PostgreSQL на удаленном сервере
-                remote_port=5432,  # Стандартный порт PostgreSQL
+                remote_port=5433,  # Порт PostgreSQL на сервере
                 local_port=settings.DB_PORT,  # Локальный порт из настроек
                 ssh_host=settings.SSH_HOST,
                 ssh_user=settings.SSH_USER,

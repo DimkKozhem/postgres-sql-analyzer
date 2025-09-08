@@ -1,9 +1,8 @@
 """Современный Streamlit интерфейс для PostgreSQL SQL Analyzer."""
 
 import streamlit as st
-from app.config import settings
-from app.ssh_tunnel import ssh_tunnel
 
+from app.config import get_default_config
 from app.ui import (
     apply_custom_styles,
     show_connection_status,
@@ -17,77 +16,16 @@ from app.ui import (
 )
 
 
-def test_db_connection(dsn: str) -> tuple[bool, str]:
+def test_db_connection(dsn):
     """Тестирует подключение к базе данных."""
     try:
         from app.analyzer import SQLAnalyzer
-        analyzer = SQLAnalyzer(dsn)
+        analyzer = SQLAnalyzer(dsn, mock_mode=False)
         # Пробуем получить простую информацию о базе
-        _ = analyzer.analyze_sql("SELECT 1 as test;")
+        test_result = analyzer.analyze_sql("SELECT 1 as test;")
         return True, "✅ Подключение успешно! База данных доступна."
     except Exception as e:
         return False, f"❌ Ошибка подключения: {str(e)}"
-
-
-def handle_database_connection(connection_type: str, dsn: str, ssh_host: str, ssh_user: str, ssh_key_path: str, port: int, username: str, password: str):
-    """Обрабатывает подключение к базе данных с созданием SSH туннеля при необходимости"""
-    with st.spinner("Подключение к базе данных..."):
-        try:
-            # Создаем SSH туннель, если нужно
-            if connection_type == "SSH туннель" and not ssh_tunnel.is_tunnel_active():
-                _ = st.info("🔐 Создание SSH туннеля...")
-                if ssh_tunnel.create_tunnel(
-                    remote_host='localhost',  # PostgreSQL на удаленном сервере
-                    remote_port=5433,  # Порт PostgreSQL на сервере
-                    local_port=port,  # Локальный порт
-                    ssh_host=ssh_host,
-                    ssh_user=ssh_user,
-                    ssh_key_path=ssh_key_path
-                ):
-                    _ = st.success("✅ SSH туннель создан успешно")
-                else:
-                    _ = st.error("❌ Не удалось создать SSH туннель")
-                    return False
-
-            # Показываем DSN для отладки (без пароля)
-            dsn_debug = dsn.replace(f"password={password}", "password=***")
-            _ = st.info(f"🔍 Подключение с DSN: {dsn_debug}")
-            
-            # Тестируем подключение к БД
-            success, message = test_db_connection(dsn)
-            if success:
-                _ = st.success("✅ Подключено к БД")
-                st.session_state.db_connected = True
-                st.session_state.connection_dsn = dsn
-                return True
-            else:
-                _ = st.error(f"❌ Ошибка подключения: {message}")
-                st.session_state.db_connected = False
-                
-                # Дополнительные советы по устранению неполадок
-                if "подключение к серверу" in message.lower():
-                    _ = st.info("💡 **Советы по устранению неполадок:**\n" +
-                              "- Убедитесь, что PostgreSQL запущен\n" +
-                              "- Проверьте правильность хоста и порта\n" +
-                              "- Убедитесь, что сервер принимает подключения")
-                elif "role" in message.lower() and "does not exist" in message.lower():
-                    _ = st.error("👤 **Проблема с пользователем PostgreSQL:**\n" +
-                               f"Пользователь '{username}' не существует в базе данных")
-                    _ = st.info("🔧 **Решение:**\n" +
-                              "1. Создайте пользователя: `sudo -u postgres createuser {username}`\n" +
-                              "2. Или используйте существующего пользователя 'postgres'\n" +
-                              "3. Проверьте пользователей: `sudo -u postgres psql -c \"\\du\"`")
-                elif "password authentication failed" in message.lower():
-                    _ = st.error("🔐 **Ошибка аутентификации:**\n" +
-                               "Неверный пароль для пользователя")
-                    _ = st.info("🔧 **Решение:**\n" +
-                              "1. Проверьте правильность пароля\n" +
-                              "2. Сбросьте пароль: `sudo -u postgres psql -c \"ALTER USER {username} PASSWORD 'new_password';\"`")
-                return False
-        except Exception as e:
-            _ = st.error(f"❌ Ошибка: {str(e)}")
-            st.session_state.db_connected = False
-            return False
 
 
 def main():
@@ -104,13 +42,12 @@ def main():
             'About': "# PostgreSQL SQL Analyzer\nИнструмент для превентивного анализа SQL-запросов"
         }
     )
-    
 
     # Применяем кастомные стили
     apply_custom_styles()
 
     # Заголовок приложения
-    _ = st.markdown("""
+    st.markdown("""
     <div class="main-header">
         <h1>🐘 PostgreSQL SQL Analyzer</h1>
         <p style="font-size: 1.2rem; margin: 0;">Инструмент для превентивного анализа SQL-запросов к PostgreSQL</p>
@@ -120,10 +57,10 @@ def main():
 
     # Боковая панель с настройками подключения
     with st.sidebar:
-        _ = st.markdown("## ⚙️ Настройки подключения")
+        st.markdown("## ⚙️ Настройки подключения")
 
         # Настройки подключения к базе данных
-        _ = st.markdown("### 🔌 Подключение к PostgreSQL")
+        st.markdown("### 🔌 Подключение к PostgreSQL")
 
         # Тип подключения
         connection_type = st.selectbox(
@@ -134,7 +71,7 @@ def main():
         )
 
         if connection_type == "Mock режим":
-            _ = st.info("🎭 Используется тестовый режим без реального подключения к БД")
+            st.info("🎭 Используется тестовый режим без реального подключения к БД")
             mock_mode = True
             dsn = ""
             host = "localhost"
@@ -144,123 +81,151 @@ def main():
             password = "skripka_user"
         else:
             mock_mode = False
-            
-            # Используем настройки из .env по умолчанию
-            host = settings.DB_HOST
-            port = settings.DB_PORT
-            database = settings.DB_NAME
-            username = settings.DB_USER
-            password = settings.DB_PASSWORD
-            ssh_host = settings.SSH_HOST
-            ssh_port = settings.SSH_PORT
-            ssh_user = settings.SSH_USER
-            ssh_key_path = settings.SSH_KEY_PATH
 
-            # SSH настройки
+            # SSH настройки (по умолчанию)
             if connection_type == "SSH туннель":
-                _ = st.markdown("#### 🔐 SSH туннель")
-                
-                # Показываем настройки из .env
+                st.markdown("#### 🔐 SSH туннель")
                 col1, col2 = st.columns(2)
                 with col1:
-                    _ = st.text_input("SSH хост", value=ssh_host, disabled=True, help="Из .env файла")
-                    _ = st.text_input("SSH пользователь", value=ssh_user, disabled=True, help="Из .env файла")
+                    ssh_host = st.text_input("SSH хост", value="193.246.150.18", help="IP адрес SSH сервера")
                 with col2:
-                    _ = st.number_input("SSH порт", value=ssh_port, disabled=True, help="Из .env файла")
-                    _ = st.text_input("SSH ключ", value=ssh_key_path, disabled=True, help="Из .env файла")
+                    ssh_port = st.number_input("SSH порт", value=22, min_value=1, max_value=65535)
+
+                ssh_user = st.text_input("SSH пользователь", value="skripka", help="Имя пользователя SSH")
+                ssh_key_path = st.text_input("Путь к SSH ключу", value="~/.ssh/id_rsa", help="Путь к приватному ключу")
+
+                st.info("🔗 SSH туннель: ssh -v -i ~/.ssh/id_rsa skripka@193.246.150.18")
 
             # Параметры подключения к БД
-            _ = st.markdown("#### 🗄️ База данных")
-            
-            # Показываем настройки из .env
+            st.markdown("#### 🗄️ База данных")
             col1, col2 = st.columns(2)
             with col1:
-                _ = st.text_input("Хост БД", value=host, disabled=True, help="Из .env файла")
-                _ = st.text_input("База данных", value=database, disabled=True, help="Из .env файла")
+                host = st.text_input("Хост БД", value="localhost", help="IP адрес или домен сервера БД")
             with col2:
-                _ = st.number_input("Порт БД", value=port, disabled=True, help="Из .env файла")
-                _ = st.text_input("Пользователь", value=username, disabled=True, help="Из .env файла")
-            
+                port = st.number_input("Порт БД", value=5433, min_value=1, max_value=65535, help="Порт PostgreSQL")
+
+            database = st.text_input("База данных", value="postgres", help="Имя базы данных")
+
+            # Пользователи для подключения
+            user_type = st.selectbox(
+                "Тип пользователя",
+                ["readonly_user (только чтение)", "admin_user (администратор)",
+                                 "postgres (суперпользователь)", "Другой"],
+                index=0,
+                help="Выберите тип пользователя для подключения"
+            )
+
+            if user_type == "readonly_user (только чтение)":
+                username = "readonly_user"
+                password = "skripka_user"
+                st.info("👤 readonly_user - безопасный доступ только для чтения")
+            elif user_type == "admin_user (администратор)":
+                username = "admin_user"
+                password = "skripka_admin"
+                st.info("👨‍💼 admin_user - административные права")
+            elif user_type == "postgres (суперпользователь)":
+                username = "postgres"
+                password = "skripka_super"
+                st.info("🔑 postgres - полные права суперпользователя")
+            else:
+                username = st.text_input("Пользователь", value="", help="Имя пользователя")
+            password = st.text_input("Пароль", type="password", help="Пароль пользователя")
+
             # Формируем DSN
             if connection_type == "SSH туннель":
                 # Для SSH туннеля используем localhost и локальный порт
-                dsn = f"host=localhost port={port} dbname={database} user={username} password={password} connect_timeout=10"
+                dsn = f"host=localhost port={port} dbname={database} user={username} password={password}"
             else:
                 # Для прямого подключения используем указанный хост
-                dsn = f"host={host} port={port} dbname={database} user={username} password={password} connect_timeout=10"
-            
-            # Отладочная информация DSN (скрываем пароль)
-            dsn_debug = dsn.replace(f"password={password}", "password=***")
-            _ = st.text_input("DSN (для отладки)", value=dsn_debug, disabled=True, help="Строка подключения к базе данных")
+                dsn = f"host={host} port={port} dbname={database} user={username} password={password}"
 
         # Настройки PostgreSQL
-        _ = st.markdown("### ⚙️ Настройки PostgreSQL")
+        st.markdown("### ⚙️ Настройки PostgreSQL")
         col1, col2 = st.columns(2)
         with col1:
-            _ = st.number_input("work_mem (MB)", value=4, min_value=1,
+            work_mem = st.number_input("work_mem (MB)", value=4, min_value=1,
                                        max_value=2048, help="Память для операций сортировки")
         with col2:
-            _ = st.number_input("shared_buffers (MB)", value=128,
+            shared_buffers = st.number_input("shared_buffers (MB)", value=128,
                                              min_value=1, max_value=8192, help="Буферный кеш")
 
-        _ = st.number_input("effective_cache_size (GB)", value=4,
+        effective_cache_size = st.number_input("effective_cache_size (GB)", value=4,
                                                min_value=1, max_value=64, help="Размер кеша ОС")
 
+        # Кнопка подключения к БД
+        if not mock_mode and connection_type != "Mock режим":
+            if st.button("🔌 Подключиться к БД", use_container_width=True, type="primary"):
+                with st.spinner("Подключение к базе данных..."):
+                    try:
+                        if connection_type == "SSH туннель":
+                            st.info("🔐 Создание SSH туннеля...")
+
+                        # Тестируем подключение к БД
+                        success, message = test_db_connection(dsn)
+                        if success:
+                            st.success("✅ Подключено к БД")
+                            st.session_state.db_connected = True
+                        else:
+                            st.error("❌ Ошибка подключения")
+                            st.session_state.db_connected = False
+                    except Exception as e:
+                        st.error(f"❌ Ошибка: {str(e)}")
+                        st.session_state.db_connected = False
+            else:
+                st.session_state.db_connected = False
 
         # Статус подключения
         if 'db_connected' in st.session_state:
             if st.session_state.db_connected:
-                _ = st.success("🟢 База данных подключена")
+                st.success("🟢 База данных подключена")
             else:
-                _ = st.error("🔴 База данных не подключена")
+                st.error("🔴 База данных не подключена")
         else:
-            _ = st.info("⚪ Статус подключения неизвестен")
+            st.info("⚪ Статус подключения неизвестен")
 
         # Настройки LLM
-        _ = st.markdown("### 🤖 Настройки AI")
+        st.markdown("### 🤖 Настройки AI")
 
         # Провайдер LLM
         llm_provider = st.selectbox(
             "Провайдер AI",
             ["OpenAI", "Anthropic", "Локальный LLM", "Отключить AI"],
-            index=0 if settings.AI_PROVIDER == "openai" else 3,
+            index=0,
             help="Выберите провайдера для AI-рекомендаций"
         )
 
         if llm_provider == "OpenAI":
             openai_api_key = st.text_input(
                 "OpenAI API Key",
-                value=settings.OPENAI_API_KEY if settings.OPENAI_API_KEY else "",
+                value="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",
                 type="password",
-                help="API ключ OpenAI (из .env файла)"
+                help="API ключ OpenAI"
             )
 
             # Актуальные модели OpenAI
-            models = [
-                "gpt-4o-mini",  # Самая доступная модель
-                "gpt-4o",       # Новая мультимодальная модель
-                "gpt-4-turbo",  # Быстрая модель GPT-4
-                "gpt-4",        # Стандартная GPT-4
-                "gpt-3.5-turbo"  # Экономичная модель
-            ]
-            default_model_index = models.index(settings.OPENAI_MODEL) if settings.OPENAI_MODEL in models else 0
-            openai_model = st.selectbox(
+                openai_model = st.selectbox(
                 "Модель OpenAI",
-                models,
-                index=default_model_index,
+                [
+                    "gpt-4o-mini",  # Самая доступная модель
+                    "gpt-4o",       # Новая мультимодальная модель
+                    "gpt-4-turbo",  # Быстрая модель GPT-4
+                    "gpt-4",        # Стандартная GPT-4
+                    "gpt-3.5-turbo"  # Экономичная модель
+                ],
+                    index=0,
                 help="Выберите модель OpenAI (gpt-4o-mini рекомендуется для баланса качества и стоимости)"
-            )
+                )
 
             temperature = st.slider(
-                "Температура",
-                min_value=0.0,
-                max_value=2.0,
-                value=settings.OPENAI_TEMPERATURE,
-                step=0.1,
+                    "Температура",
+                    min_value=0.0,
+                    max_value=2.0,
+                    value=0.7,
+                    step=0.1,
                 help="Креативность ответов (0.0 - детерминированно, 2.0 - очень креативно)"
             )
 
-            enable_ai = settings.ENABLE_AI_RECOMMENDATIONS
+            enable_ai = True
             anthropic_api_key = ""
             local_llm_url = ""
             local_llm_model = ""
@@ -268,19 +233,19 @@ def main():
             # Сохраняем в session_state для использования в других модулях
             st.session_state['enable_ai'] = enable_ai
             st.session_state['ai_provider'] = llm_provider
-            st.session_state['openai_api_key'] = openai_api_key
-            st.session_state['openai_model'] = openai_model
+                    st.session_state['openai_api_key'] = openai_api_key
+                    st.session_state['openai_model'] = openai_model
             st.session_state['openai_temperature'] = temperature
 
         elif llm_provider == "Anthropic":
-            anthropic_api_key = st.text_input(
+                anthropic_api_key = st.text_input(
                 "Anthropic API Key",
                 value="",
-                type="password",
+                    type="password",
                 help="API ключ Anthropic"
-            )
+                )
 
-            anthropic_model = st.selectbox(
+                anthropic_model = st.selectbox(
                 "Модель Anthropic",
                 [
                     "claude-3-5-sonnet-20241022",  # Самая новая и мощная
@@ -290,8 +255,8 @@ def main():
                     "claude-3-haiku-20240307"      # Самая быстрая
                 ],
                 index=1,
-                help="Выберите модель Anthropic"
-            )
+                    help="Выберите модель Anthropic"
+                )
 
             temperature = st.slider(
                 "Температура", 
@@ -371,7 +336,7 @@ def main():
             local_llm_url = ""
             local_llm_model = ""
             temperature = 0.7
-            _ = st.info("🚫 AI-рекомендации отключены")
+            st.info("🚫 AI-рекомендации отключены")
             
             # Сохраняем в session_state для использования в других модулях
             st.session_state['enable_ai'] = enable_ai
@@ -379,40 +344,26 @@ def main():
         
         # Дополнительные настройки AI
         if enable_ai:
-            _ = st.markdown("#### 🎯 Дополнительные настройки AI")
-            _ = st.slider(
+            st.markdown("#### 🎯 Дополнительные настройки AI")
+            ai_confidence_threshold = st.slider(
                 "Порог уверенности", 
                 min_value=0.0, 
                 max_value=1.0, 
-                value=settings.AI_CONFIDENCE_THRESHOLD, 
+                value=0.7, 
                 step=0.1,
                 help="Минимальная уверенность для показа рекомендаций"
             )
         else:
-            _ = settings.AI_CONFIDENCE_THRESHOLD
+            ai_confidence_threshold = 0.7
         
-        # Кнопка подключения к БД (в конце sidebar)
-        _ = st.markdown("---")
-        _ = st.markdown("#### 🔌 Подключение к БД")
-        
-        if st.button("🔌 Подключиться к БД", use_container_width=True, type="primary"):
-            # Вызываем функцию обработки подключения
-            _ = handle_database_connection(connection_type, dsn, ssh_host, ssh_user, ssh_key_path, port, username, password)
-        else:
-            st.session_state.db_connected = False
+    
+    # Проверяем подключение
+    if not mock_mode and (not dsn or not all([host, database, username])):
+        st.warning("⚠️ Заполните все обязательные поля подключения в боковой панели")
+        return
     
     # Показываем статус подключения
-    if 'db_connected' in st.session_state and st.session_state.db_connected:
-        _ = show_connection_status(dsn)
-    else:
-        # Показываем информационное сообщение о том, что база не подключена
-        _ = st.info("ℹ️ **База данных не подключена**\n\nДля начала работы нажмите кнопку \"🔌 Подключиться к БД\" в боковой панели.")
-        
-        # Показываем только вкладку "Обзор БД" с сообщением о подключении
-        _ = st.markdown("---")
-        _ = st.markdown("### 🗄️ Обзор базы данных")
-        _ = st.warning("⚠️ Для просмотра информации о базе данных необходимо подключиться к ней.")
-        return
+    show_connection_status(dsn)
     
     # Основные вкладки
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -425,6 +376,25 @@ def main():
         "❓ Помощь"
     ])
     
+    # Конфигурация для анализа
+    custom_config = {
+        "work_mem": work_mem,
+        "shared_buffers": shared_buffers,
+        "effective_cache_size": effective_cache_size * 1024,  # Конвертируем в MB
+        "large_table_threshold": 1000000,
+        "expensive_query_threshold": 1000.0,
+        "slow_query_threshold": 100.0,
+        "enable_ai_recommendations": enable_ai,
+        "ai_provider": llm_provider.lower(),
+        "ai_confidence_threshold": ai_confidence_threshold,
+        "openai_api_key": openai_api_key,
+        "openai_model": openai_model,
+        "openai_temperature": temperature,
+        "anthropic_api_key": anthropic_api_key,
+        "anthropic_model": anthropic_model if llm_provider == "Anthropic" else "claude-3-5-sonnet-20240620",
+        "local_llm_url": local_llm_url,
+        "local_llm_model": local_llm_model
+    }
     
     with tab1:
         show_db_overview_tab(dsn, mock_mode)

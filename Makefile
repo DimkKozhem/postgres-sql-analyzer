@@ -31,15 +31,15 @@ install-dev: ## Установить зависимости для разраб�
 
 test: ## Запустить тесты
 	@echo "$(GREEN)Запуск тестов...$(NC)"
-	$(PYTEST) tests/ -v --cov=app --cov-report=html --cov-report=term-missing
+	$(PYTEST) tests/unit/ tests/integration/ -v --cov=app --cov-report=html --cov-report=term-missing
 
 test-fast: ## Запустить тесты быстро (без покрытия)
 	@echo "$(GREEN)Быстрый запуск тестов...$(NC)"
-	$(PYTEST) tests/ -v
+	$(PYTEST) tests/unit/ tests/integration/ -v
 
 test-coverage: ## Запустить тесты с детальным покрытием
 	@echo "$(GREEN)Запуск тестов с покрытием...$(NC)"
-	$(PYTEST) tests/ --cov=app --cov-report=html --cov-report=xml --cov-report=term-missing
+	$(PYTEST) tests/unit/ tests/integration/ --cov=app --cov-report=html --cov-report=xml --cov-report=term-missing
 
 lint: ## Проверить код линтерами
 	@echo "$(GREEN)Проверка кода линтерами...$(NC)"
@@ -65,21 +65,18 @@ security: ## Проверить безопасность кода
 
 run: ## Запустить Streamlit приложение
 	@echo "$(GREEN)Запуск Streamlit приложения...$(NC)"
-	$(STREAMLIT) run app/streamlit_app.py
+	$(PYTHON) scripts/run_streamlit.py
 
-run-mock: ## Запустить в mock режиме
-	@echo "$(GREEN)Запуск в mock режиме...$(NC)"
-	SQL_ANALYZER_MOCK_MODE=true $(STREAMLIT) run app/streamlit_app.py
 
 cli-test: ## Тестировать CLI
 	@echo "$(GREEN)Тестирование CLI...$(NC)"
-	$(PYTHON) -m app.cli test --mock
+	$(PYTHON) -m app.cli test --dsn "postgresql://test:test@localhost:5432/test"
 	$(PYTHON) -m app.cli examples
 	$(PYTHON) -m app.cli config
 
 cli-analyze: ## Анализ SQL через CLI
 	@echo "$(GREEN)Анализ SQL через CLI...$(NC)"
-	$(PYTHON) -m app.cli analyze --sql "SELECT * FROM users LIMIT 10;" --mock
+	$(PYTHON) -m app.cli analyze --sql "SELECT * FROM users LIMIT 10;" --dsn "postgresql://test:test@localhost:5432/test"
 
 docker-build: ## Собрать Docker образ
 	@echo "$(GREEN)Сборка Docker образа...$(NC)"
@@ -153,7 +150,7 @@ ci-security: ## Команда для CI (безопасность)
 # Команды для анализа производительности
 profile: ## Профилирование производительности
 	@echo "$(GREEN)Профилирование производительности...$(NC)"
-	$(PYTHON) -m cProfile -o profile.stats -m app.cli test --mock
+	$(PYTHON) -m cProfile -o profile.stats -m app.cli test --dsn "postgresql://test:test@localhost:5432/test"
 	@echo "$(GREEN)Профилирование завершено!$(NC)"
 
 benchmark: ## Бенчмарк тесты
@@ -198,7 +195,7 @@ update: ## Обновление зависимостей
 # Команды для отладки
 debug: ## Запуск в режиме отладки
 	@echo "$(GREEN)Запуск в режиме отладки...$(NC)"
-	$(PYTHON) -m pdb -m app.cli test --mock
+	$(PYTHON) -m pdb -m app.cli test --dsn "postgresql://test:test@localhost:5432/test"
 
 # Команды для проверки версий
 versions: ## Показать версии компонентов

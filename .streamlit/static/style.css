@@ -1,0 +1,376 @@
+/* PostgreSQL SQL Analyzer - Тёмная тема с улучшенной читаемостью */
+
+/* CSS переменные для цветовой схемы PostgreSQL */
+:root {
+    --primary-color: #336791;        /* PostgreSQL синий */
+    --secondary-color: #4a90a4;      /* Светло-синий */
+    --accent-color: #7b68ee;         /* Фиолетовый акцент */
+    --success-color: #28a745;        /* Зелёный для успеха */
+    --warning-color: #ffc107;        /* Жёлтый для предупреждений */
+    --error-color: #dc3545;          /* Красный для ошибок */
+    --info-color: #17a2b8;           /* Голубой для информации */
+    
+    --background-color: #1e1e1e;     /* Основной тёмный фон */
+    --surface-color: #2d2d2d;        /* Поверхность */
+    --surface-hover: #3a3a3a;        /* Поверхность при наведении */
+    --border-color: #404040;         /* Цвет границ */
+    
+    --text-color: #ffffff;           /* Основной текст */
+    --text-secondary: #e0e0e0;       /* Вторичный текст (более светлый) */
+    --text-muted: #a0a0a0;           /* Приглушённый текст */
+    
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 6px 12px rgba(0, 0, 0, 0.4);
+    --border-radius: 8px;
+    --transition: all 0.3s ease;
+}
+
+/* Принудительная тёмная тема - отключаем автоматическое изменение */
+html, body {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    font-weight: 400 !important;
+}
+
+/* Улучшенная читаемость основного текста */
+.main .block-container {
+    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    color: var(--text-color) !important;
+}
+
+/* Заголовки */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 600 !important;
+    color: var(--text-color) !important;
+    line-height: 1.4 !important;
+}
+
+h1 { font-size: 2.5rem !important; }
+h2 { font-size: 2rem !important; }
+h3 { font-size: 1.75rem !important; }
+h4 { font-size: 1.5rem !important; }
+h5 { font-size: 1.25rem !important; }
+h6 { font-size: 1.1rem !important; }
+
+/* Параграфы и текст */
+p, div, span {
+    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    color: var(--text-color) !important;
+}
+
+/* Стилизация вкладок */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: var(--surface-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 4px !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent !important;
+    color: var(--text-secondary) !important;
+    border-radius: 4px !important;
+    transition: var(--transition) !important;
+    font-weight: 500 !important;
+    font-size: 16px !important;
+    padding: 8px 16px !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: var(--primary-color) !important;
+    color: var(--text-color) !important;
+    font-weight: 600 !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-color) !important;
+}
+
+/* Кнопки */
+.stButton > button {
+    background-color: var(--primary-color) !important;
+    color: var(--text-color) !important;
+    border: none !important;
+    border-radius: var(--border-radius) !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 500 !important;
+    font-size: 16px !important;
+    transition: var(--transition) !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.stButton > button:hover {
+    background-color: var(--secondary-color) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-hover) !important;
+}
+
+/* Поля ввода */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div > select {
+    background-color: var(--surface-color) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    font-size: 16px !important;
+    padding: 0.75rem !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 2px rgba(51, 103, 145, 0.2) !important;
+}
+
+/* Чекбоксы и радио кнопки */
+.stCheckbox > label,
+.stRadio > label {
+    color: var(--text-color) !important;
+    font-size: 16px !important;
+    font-weight: 400 !important;
+}
+
+/* Информационные блоки */
+.stAlert {
+    border-radius: var(--border-radius) !important;
+    border: none !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.stAlert[data-testid="alert-success"] {
+    background-color: rgba(40, 167, 69, 0.1) !important;
+    border-left: 4px solid var(--success-color) !important;
+    color: var(--success-color) !important;
+}
+
+.stAlert[data-testid="alert-error"] {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+    border-left: 4px solid var(--error-color) !important;
+    color: var(--error-color) !important;
+}
+
+.stAlert[data-testid="alert-warning"] {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+    border-left: 4px solid var(--warning-color) !important;
+    color: var(--warning-color) !important;
+}
+
+.stAlert[data-testid="alert-info"] {
+    background-color: rgba(23, 162, 184, 0.1) !important;
+    border-left: 4px solid var(--info-color) !important;
+    color: var(--info-color) !important;
+}
+
+/* Таблицы */
+.stDataFrame {
+    background-color: var(--surface-color) !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.stDataFrame table {
+    background-color: var(--surface-color) !important;
+    color: var(--text-color) !important;
+    font-size: 14px !important;
+}
+
+.stDataFrame th {
+    background-color: var(--primary-color) !important;
+    color: var(--text-color) !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+}
+
+.stDataFrame td {
+    background-color: var(--surface-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+    font-size: 14px !important;
+}
+
+/* Sidebar */
+.css-1d391kg {
+    background-color: var(--surface-color) !important;
+}
+
+.css-1d391kg .stTextInput > div > div > input,
+.css-1d391kg .stTextArea > div > div > textarea,
+.css-1d391kg .stSelectbox > div > div > select {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Метрики */
+.stMetric {
+    background-color: var(--surface-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 1rem !important;
+    box-shadow: var(--shadow) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.stMetric > div {
+    color: var(--text-color) !important;
+}
+
+.stMetric > div > div {
+    color: var(--text-secondary) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+.stMetric > div > div:first-child {
+    color: var(--text-color) !important;
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+}
+
+/* Код */
+.stCode {
+    background-color: var(--background-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Графики */
+.plotly {
+    background-color: var(--surface-color) !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: var(--shadow) !important;
+}
+
+/* Скроллбары */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--surface-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Специальные классы для сообщений */
+.connection-message {
+    background-color: var(--surface-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 2rem !important;
+    text-align: center !important;
+    box-shadow: var(--shadow) !important;
+    margin: 2rem 0 !important;
+}
+
+.connection-message h3 {
+    color: var(--primary-color) !important;
+    margin-bottom: 1rem !important;
+}
+
+.connection-message p {
+    color: var(--text-secondary) !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+}
+
+.info-message {
+    background-color: rgba(23, 162, 184, 0.1) !important;
+    border: 1px solid var(--info-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 1rem !important;
+    margin: 1rem 0 !important;
+    color: var(--info-color) !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+}
+
+/* Принудительное отключение светлой темы */
+[data-testid="stAppViewContainer"] {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-testid="stSidebar"] {
+    background-color: var(--surface-color) !important;
+}
+
+[data-testid="stSidebar"] * {
+    color: var(--text-color) !important;
+}
+
+/* Улучшенная читаемость для всех элементов */
+* {
+    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+/* Специальные стили для кода */
+code, pre, .stCode {
+    font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Улучшенные стили для markdown */
+.stMarkdown {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    color: var(--text-color) !important;
+}
+
+.stMarkdown p {
+    margin-bottom: 1rem !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+}
+
+.stMarkdown ul, .stMarkdown ol {
+    margin-bottom: 1rem !important;
+    padding-left: 2rem !important;
+}
+
+.stMarkdown li {
+    margin-bottom: 0.5rem !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+}
+
+/* Улучшенные стили для блоков кода в markdown */
+.stMarkdown pre {
+    background-color: var(--background-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 1rem !important;
+    overflow-x: auto !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+.stMarkdown code {
+    background-color: var(--surface-color) !important;
+    color: var(--accent-color) !important;
+    padding: 0.2rem 0.4rem !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+}

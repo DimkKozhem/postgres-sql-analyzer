@@ -1,0 +1,26 @@
+[theme]
+# PostgreSQL цветовая схема - принудительная тёмная тема
+primaryColor = "#336791"  # PostgreSQL синий
+backgroundColor = "#1e1e1e"  # Тёмный фон
+secondaryBackgroundColor = "#2d2d2d"  # Вторичный фон
+textColor = "#ffffff"  # Белый текст
+font = "sans serif"  # Читаемый шрифт без засечек
+base = "dark"  # Принудительная тёмная тема
+
+[server]
+headless = true
+port = 8505
+enableCORS = true
+enableXsrfProtection = true
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

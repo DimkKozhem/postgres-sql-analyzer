@@ -15,7 +15,6 @@ class ProductionSettings(Settings):
     SERVER_HEADLESS: bool = True
     
     # Безопасность
-    MOCK_MODE: bool = False  # Отключаем mock режим в продакшене
     
     # LLM настройки (настройте свои API ключи)
     ENABLE_AI_RECOMMENDATIONS: bool = True
@@ -55,7 +54,6 @@ def get_production_config():
         "server_host": production_settings.SERVER_HOST,
         "server_port": production_settings.SERVER_PORT,
         "server_headless": production_settings.SERVER_HEADLESS,
-        "mock_mode": production_settings.MOCK_MODE,
         "enable_ai_recommendations": production_settings.ENABLE_AI_RECOMMENDATIONS,
         "ai_provider": production_settings.AI_PROVIDER,
         "openai_api_key": production_settings.OPENAI_API_KEY,

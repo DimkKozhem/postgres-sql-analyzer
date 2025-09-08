@@ -3,7 +3,6 @@
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
-import re
 
 
 class Priority(Enum):
@@ -40,11 +39,11 @@ class Recommendation:
 
 class RecommendationEngine:
     """Движок для генерации рекомендаций."""
-    
+
     def __init__(self):
         self.recommendations: List[Recommendation] = []
         self._initialize_recommendations()
-    
+
     def _initialize_recommendations(self):
         """Инициализирует базовые рекомендации."""
         self.recommendations = [
@@ -59,7 +58,7 @@ class RecommendationEngine:
                 sql_example="-- Текущий запрос:\nSELECT * FROM users WHERE email = 'user@example.com';\n\n-- Рекомендуемый индекс:\nCREATE INDEX idx_users_email ON users(email);",
                 estimated_impact="Высокий - создание индекса по условию WHERE"
             ),
-            
+
             Recommendation(
                 id="composite_index",
                 title="Создать составной индекс",
@@ -70,7 +69,7 @@ class RecommendationEngine:
                 sql_example="-- Текущий запрос:\nSELECT * FROM orders WHERE user_id = 123 AND status = 'pending';\n\n-- Рекомендуемый индекс:\nCREATE INDEX idx_orders_user_status ON orders(user_id, status);",
                 estimated_impact="Средний - оптимизация составных условий"
             ),
-            
+
             # Рекомендации по соединениям
             Recommendation(
                 id="nested_loop_to_hash_join",
@@ -82,7 +81,7 @@ class RecommendationEngine:
                 sql_example="-- Добавить индекс для внешнего ключа:\nCREATE INDEX idx_orders_user_id ON orders(user_id);\n\n-- Или изменить порядок соединений в запросе",
                 estimated_impact="Высокий - оптимизация алгоритма соединения"
             ),
-            
+
             Recommendation(
                 id="hash_join_optimization",
                 title="Оптимизировать хеш-соединения",
@@ -93,7 +92,7 @@ class RecommendationEngine:
                 configuration_example="-- Увеличить work_mem:\nSET work_mem = '64MB';  -- или больше в зависимости от размера данных",
                 estimated_impact="Средний - оптимизация использования памяти"
             ),
-            
+
             # Рекомендации по памяти
             Recommendation(
                 id="sort_optimization",
@@ -106,7 +105,7 @@ class RecommendationEngine:
                 sql_example="-- Создать индекс для избежания сортировки:\nCREATE INDEX idx_users_name ON users(name);",
                 estimated_impact="Средний - оптимизация операций сортировки"
             ),
-            
+
             Recommendation(
                 id="hash_aggregate_optimization",
                 title="Оптимизировать хеш-агрегацию",
@@ -117,7 +116,7 @@ class RecommendationEngine:
                 configuration_example="-- Увеличить work_mem для агрегации:\nSET work_mem = '64MB';",
                 estimated_impact="Средний - оптимизация агрегатных операций"
             ),
-            
+
             # Рекомендации по конфигурации
             Recommendation(
                 id="work_mem_optimization",
@@ -129,7 +128,7 @@ class RecommendationEngine:
                 configuration_example="-- Рекомендуемое значение work_mem:\nSET work_mem = '128MB';  -- для сложных запросов",
                 estimated_impact="Низкий - тонкая настройка параметров"
             ),
-            
+
             Recommendation(
                 id="shared_buffers_optimization",
                 title="Оптимизировать shared_buffers",
@@ -140,7 +139,7 @@ class RecommendationEngine:
                 configuration_example="-- Рекомендуемое значение shared_buffers:\nSET shared_buffers = '256MB';  -- 25% от доступной RAM",
                 estimated_impact="Низкий - улучшение кэширования"
             ),
-            
+
             # Рекомендации по структуре запроса
             Recommendation(
                 id="limit_optimization",
@@ -152,7 +151,7 @@ class RecommendationEngine:
                 sql_example="-- Добавить LIMIT:\nSELECT * FROM users WHERE active = true LIMIT 100;",
                 estimated_impact="Средний - ограничение объема возвращаемых данных"
             ),
-            
+
             Recommendation(
                 id="cte_optimization",
                 title="Оптимизировать CTE (Common Table Expressions)",
@@ -163,7 +162,7 @@ class RecommendationEngine:
                 sql_example="-- Вместо CTE использовать подзапрос:\nSELECT * FROM (\n  SELECT user_id, COUNT(*) as order_count\n  FROM orders\n  GROUP BY user_id\n) user_stats WHERE order_count > 10;",
                 estimated_impact="Низкий - оптимизация структуры запроса"
             ),
-            
+
             # Рекомендации по статистике
             Recommendation(
                 id="update_statistics",
@@ -176,121 +175,174 @@ class RecommendationEngine:
                 estimated_impact="Низкий - улучшение качества планировщика"
             )
         ]
-    
-    def analyze_plan(self, plan_data: Dict[str, Any], metrics: Dict[str, Any], config: Dict[str, Any]) -> List[Recommendation]:
+
+    def analyze_plan(self,
+                     plan_data: Dict[str,
+                                     Any],
+                     metrics: Dict[str,
+                                   Any],
+                     config: Dict[str,
+                                  Any]) -> List[Recommendation]:
         """Анализирует план выполнения и генерирует рекомендации."""
         applicable_recommendations = []
-        
+
         # Анализируем каждый узел плана
-        self._analyze_plan_node(plan_data.get('Plan', {}), applicable_recommendations, metrics, config)
-        
+        self._analyze_plan_node(
+            plan_data.get(
+                'Plan',
+                {}),
+            applicable_recommendations,
+            metrics,
+            config)
+
         # Анализируем общие метрики
         self._analyze_metrics(metrics, applicable_recommendations, config)
-        
+
         # Сортируем по приоритету
-        applicable_recommendations.sort(key=lambda r: self._priority_score(r.priority), reverse=True)
-        
+        applicable_recommendations.sort(
+            key=lambda r: self._priority_score(
+                r.priority), reverse=True)
+
         return applicable_recommendations
-    
-    def _analyze_plan_node(self, node: Dict[str, Any], recommendations: List[Recommendation], metrics: Dict[str, Any], config: Dict[str, Any]):
+
+    def _analyze_plan_node(self,
+                           node: Dict[str,
+                                      Any],
+                           recommendations: List[Recommendation],
+                           metrics: Dict[str,
+                                         Any],
+                           config: Dict[str,
+                                        Any]):
         """Рекурсивно анализирует узлы плана."""
         if not node:
             return
-        
+
         node_type = node.get('Node Type', '')
-        
+
         # Проверяем конкретные типы узлов
         if 'Seq Scan' in node_type:
-            self._check_seq_scan_recommendations(node, recommendations, metrics)
-        
+            self._check_seq_scan_recommendations(
+                node, recommendations, metrics)
+
         elif 'Nested Loop' in node_type:
-            self._check_nested_loop_recommendations(node, recommendations, metrics)
-        
+            self._check_nested_loop_recommendations(
+                node, recommendations, metrics)
+
         elif 'Sort' in node_type:
             self._check_sort_recommendations(node, recommendations, config)
-        
+
         elif 'Hash' in node_type:
             self._check_hash_recommendations(node, recommendations, config)
-        
+
         # Рекурсивно анализируем дочерние узлы
         if 'Plans' in node:
             for child in node['Plans']:
-                self._analyze_plan_node(child, recommendations, metrics, config)
-    
-    def _check_seq_scan_recommendations(self, node: Dict[str, Any], recommendations: List[Recommendation], metrics: Dict[str, Any]):
+                self._analyze_plan_node(
+                    child, recommendations, metrics, config)
+
+    def _check_seq_scan_recommendations(self,
+                                        node: Dict[str,
+                                                   Any],
+                                        recommendations: List[Recommendation],
+                                        metrics: Dict[str,
+                                                      Any]):
         """Проверяет рекомендации для последовательного сканирования."""
         relation_name = node.get('Relation Name', '')
         plan_rows = node.get('Plan Rows', 0)
-        
+
         # Если таблица большая, рекомендуем создать индекс
         if plan_rows > 10000:  # Порог для "большой" таблицы
-            seq_scan_rec = next((r for r in self.recommendations if r.id == "seq_scan_to_index"), None)
+            seq_scan_rec = next(
+                (r for r in self.recommendations if r.id == "seq_scan_to_index"), None)
             if seq_scan_rec:
                 # Клонируем рекомендацию с конкретными деталями
                 specific_rec = Recommendation(
                     id=f"seq_scan_{relation_name}",
                     title=f"Создать индекс для таблицы {relation_name}",
-                    description=f"Таблица {relation_name} сканируется последовательно ({plan_rows:,} строк). Создание индекса может значительно ускорить запрос.",
+                    description=f"Таблица {relation_name} сканируется последовательно ({
+                        plan_rows:,    } строк). Создание индекса может значительно ускорить запрос.",
                     priority=Priority.HIGH,
                     category=Category.INDEX,
                     potential_improvement="10x-100x",
                     sql_example=f"-- Создать индекс для таблицы {relation_name}:\nCREATE INDEX idx_{relation_name}_id ON {relation_name}(id);",
-                    estimated_impact="Высокий - создание индекса для большой таблицы"
-                )
+                    estimated_impact="Высокий - создание индекса для большой таблицы")
                 recommendations.append(specific_rec)
-    
-    def _check_nested_loop_recommendations(self, node: Dict[str, Any], recommendations: List[Recommendation], metrics: Dict[str, Any]):
+
+    def _check_nested_loop_recommendations(
+            self, node: Dict[str, Any], recommendations: List[Recommendation], metrics: Dict[str, Any]):
         """Проверяет рекомендации для вложенных циклов."""
-        nested_loop_rec = next((r for r in self.recommendations if r.id == "nested_loop_to_hash_join"), None)
+        nested_loop_rec = next(
+            (r for r in self.recommendations if r.id == "nested_loop_to_hash_join"), None)
         if nested_loop_rec:
             recommendations.append(nested_loop_rec)
-    
-    def _check_sort_recommendations(self, node: Dict[str, Any], recommendations: List[Recommendation], config: Dict[str, Any]):
+
+    def _check_sort_recommendations(self,
+                                    node: Dict[str,
+                                               Any],
+                                    recommendations: List[Recommendation],
+                                    config: Dict[str,
+                                                 Any]):
         """Проверяет рекомендации для операций сортировки."""
         plan_rows = node.get('Plan Rows', 0)
         work_mem = config.get('work_mem', 4)
-        
+
         # Если сортировка большая, рекомендуем увеличить work_mem
         if plan_rows > 10000 and work_mem < 32:
-            sort_rec = next((r for r in self.recommendations if r.id == "sort_optimization"), None)
+            sort_rec = next(
+                (r for r in self.recommendations if r.id == "sort_optimization"), None)
             if sort_rec:
                 recommendations.append(sort_rec)
-    
-    def _check_hash_recommendations(self, node: Dict[str, Any], recommendations: List[Recommendation], config: Dict[str, Any]):
+
+    def _check_hash_recommendations(self,
+                                    node: Dict[str,
+                                               Any],
+                                    recommendations: List[Recommendation],
+                                    config: Dict[str,
+                                                 Any]):
         """Проверяет рекомендации для хеш-операций."""
         plan_rows = node.get('Plan Rows', 0)
         work_mem = config.get('work_mem', 4)
-        
+
         # Если хеш-операция большая, рекомендуем увеличить work_mem
         if plan_rows > 10000 and work_mem < 64:
-            hash_rec = next((r for r in self.recommendations if r.id == "hash_aggregate_optimization"), None)
+            hash_rec = next(
+                (r for r in self.recommendations if r.id == "hash_aggregate_optimization"),
+                None)
             if hash_rec:
                 recommendations.append(hash_rec)
-    
-    def _analyze_metrics(self, metrics: Dict[str, Any], recommendations: List[Recommendation], config: Dict[str, Any]):
+
+    def _analyze_metrics(self,
+                         metrics: Dict[str,
+                                       Any],
+                         recommendations: List[Recommendation],
+                         config: Dict[str,
+                                      Any]):
         """Анализирует общие метрики запроса."""
         estimated_time = metrics.get('estimated_time_ms', 0)
         estimated_io = metrics.get('estimated_io_mb', 0)
         total_cost = metrics.get('total_cost', 0)
-        
+
         # Если запрос медленный, добавляем общие рекомендации
         if estimated_time > 100:  # Порог для "медленного" запроса
-            limit_rec = next((r for r in self.recommendations if r.id == "limit_optimization"), None)
+            limit_rec = next(
+                (r for r in self.recommendations if r.id == "limit_optimization"), None)
             if limit_rec:
                 recommendations.append(limit_rec)
-        
+
         # Если I/O высокий, рекомендуем оптимизировать shared_buffers
         if estimated_io > 100:  # Порог для "высокого" I/O
-            shared_buffers_rec = next((r for r in self.recommendations if r.id == "shared_buffers_optimization"), None)
+            shared_buffers_rec = next(
+                (r for r in self.recommendations if r.id == "shared_buffers_optimization"), None)
             if shared_buffers_rec:
                 recommendations.append(shared_buffers_rec)
-        
+
         # Если стоимость запроса высокая, рекомендуем обновить статистику
         if total_cost > 1000:  # Порог для "дорогого" запроса
-            stats_rec = next((r for r in self.recommendations if r.id == "update_statistics"), None)
+            stats_rec = next(
+                (r for r in self.recommendations if r.id == "update_statistics"), None)
             if stats_rec:
                 recommendations.append(stats_rec)
-    
+
     def _priority_score(self, priority: Priority) -> int:
         """Возвращает числовой score для приоритета."""
         return {
@@ -298,11 +350,13 @@ class RecommendationEngine:
             Priority.MEDIUM: 2,
             Priority.LOW: 1
         }[priority]
-    
-    def get_recommendations_by_category(self, category: Category) -> List[Recommendation]:
+
+    def get_recommendations_by_category(
+            self, category: Category) -> List[Recommendation]:
         """Возвращает рекомендации по категории."""
         return [r for r in self.recommendations if r.category == category]
-    
-    def get_recommendations_by_priority(self, priority: Priority) -> List[Recommendation]:
+
+    def get_recommendations_by_priority(
+            self, priority: Priority) -> List[Recommendation]:
         """Возвращает рекомендации по приоритету."""
         return [r for r in self.recommendations if r.priority == priority]
