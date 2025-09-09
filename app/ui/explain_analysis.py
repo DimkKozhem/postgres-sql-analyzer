@@ -1,7 +1,11 @@
 """Модуль для вкладки 'Explain анализ' с LLM."""
 
+from py_pg_explain_analyzer.llm_summarizer import run_llm
+from py_pg_explain_analyzer.sql_metadata_extractor import TableInfoExtractor
+from py_pg_explain_analyzer.sql_parser import SqlAnalyzer
+from py_pg_explain_analyzer.db import PgConnection
+from py_pg_explain_analyzer import PgExplainAnalyzer, AnalysisRequest, AnalysisResult
 import streamlit as st
-import json
 import logging
 import pandas as pd
 from typing import Dict, Any, List, Optional
@@ -12,18 +16,31 @@ import os
 # Добавляем путь к модулю _explain_analyze
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '_explain_analyze'))
 
-from py_pg_explain_analyzer import PgExplainAnalyzer, AnalysisRequest, AnalysisResult
-from py_pg_explain_analyzer.db import PgConnection
-from py_pg_explain_analyzer.sql_parser import SqlAnalyzer
-from py_pg_explain_analyzer.sql_metadata_extractor import TableInfoExtractor
-from py_pg_explain_analyzer.llm_summarizer import run_llm
 
 logger = logging.getLogger(__name__)
 
 
 def show_explain_analysis_tab(dsn: str, mock_mode: bool = False):
-    """Отображает вкладку 'Explain анализ'."""
-    st.markdown("## 🔍 Explain анализ SQL запросов")
+    """Отображает вкладку 'Explain анализ' с красивым дашбордом."""
+    # Красивый заголовок
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    ">
+        <h1 style="font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            🔍 Explain анализ SQL запросов
+        </h1>
+        <p style="font-size: 1.2rem; margin: 1rem 0; opacity: 0.9;">
+            Интеллектуальный анализ планов выполнения с AI-рекомендациями
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     if mock_mode:
         st.info("🎭 Mock режим: отображаются тестовые данные")
@@ -31,19 +48,112 @@ def show_explain_analysis_tab(dsn: str, mock_mode: bool = False):
         return
 
     try:
-        # Поле для ввода SQL запроса
-        _show_sql_input()
+        # Создаем вкладки для разных разделов
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📝 Ввод SQL",
+            "📊 Анализ плана",
+            "🤖 AI рекомендации",
+            "📈 Сравнение"
+        ])
 
-        # Анализ запроса
-        if st.session_state.get('sql_query'):
-            _analyze_sql_query(dsn)
+        with tab1:
+            _show_sql_input_dashboard()
 
-        # Сравнение планов
-        _show_plan_comparison()
+        with tab2:
+            if st.session_state.get('sql_query'):
+                _analyze_sql_query(dsn)
+            else:
+                _show_analysis_placeholder()
+
+        with tab3:
+            if st.session_state.get('current_analysis'):
+                _show_ai_recommendations_dashboard()
+            else:
+                _show_ai_placeholder()
+
+        with tab4:
+            _show_plan_comparison()
 
     except Exception as e:
         st.error(f"❌ Ошибка анализа SQL: {str(e)}")
         logger.error(f"Ошибка в show_explain_analysis_tab: {e}")
+
+
+def _show_sql_input_dashboard():
+    """Отображает красивое поле для ввода SQL запроса."""
+    st.markdown("### 📝 Ввод SQL запроса")
+
+    # Красивая карточка для ввода
+    st.markdown("""
+    <div style="
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        border-left: 4px solid #4CAF50;
+        margin-bottom: 2rem;
+    ">
+        <h3 style="color: #4CAF50; margin: 0 0 1rem 0;">💡 Введите ваш SQL запрос</h3>
+        <p style="color: #666; margin: 0;">
+            Поддерживаются SELECT, INSERT, UPDATE, DELETE запросы с автоматическим анализом плана выполнения
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _show_sql_input()
+
+
+def _show_analysis_placeholder():
+    """Показывает заглушку для анализа."""
+    st.markdown("""
+    <div style="
+        background: #f8f9fa;
+        padding: 3rem;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px dashed #dee2e6;
+        margin: 2rem 0;
+    ">
+        <h3 style="color: #6c757d; margin: 0 0 1rem 0;">📊 Анализ плана выполнения</h3>
+        <p style="color: #6c757d; margin: 0;">
+            Введите SQL запрос в разделе "📝 Ввод SQL" для начала анализа
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _show_ai_placeholder():
+    """Показывает заглушку для AI рекомендаций."""
+    st.markdown("""
+    <div style="
+        background: #f8f9fa;
+        padding: 3rem;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px dashed #dee2e6;
+        margin: 2rem 0;
+    ">
+        <h3 style="color: #6c757d; margin: 0 0 1rem 0;">🤖 AI рекомендации</h3>
+        <p style="color: #6c757d; margin: 0;">
+            После анализа SQL запроса здесь появятся интеллектуальные рекомендации по оптимизации
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _show_ai_recommendations_dashboard():
+    """Показывает красивый дашборд с AI рекомендациями."""
+    st.markdown("### 🤖 AI рекомендации по оптимизации")
+
+    # Автоматически запускаем AI анализ
+    if st.session_state.get('current_analysis') and not st.session_state.get('ai_analysis_done'):
+        st.session_state['run_ai_analysis'] = True
+        st.session_state['ai_analysis_done'] = True
+        st.rerun()
+
+    # Показываем результаты если есть
+    if 'llm_analysis_result' in st.session_state:
+        _display_llm_analysis_results(st.session_state['llm_analysis_result'])
 
 
 def _show_sql_input():
@@ -101,7 +211,7 @@ def _analyze_sql_query(dsn: str):
             # Создаем подключение к БД
             db_conn = PgConnection(dsn)
             analyzer = PgExplainAnalyzer(db_conn)
-            
+
             # Создаем запрос на анализ
             analysis_request = AnalysisRequest(
                 sql=sql_query,
@@ -109,13 +219,13 @@ def _analyze_sql_query(dsn: str):
                 verbose=True,  # Подробная информация
                 buffers=True,  # Информация о буферах
                 timing=True,   # Время выполнения
-                settings=True, # Настройки PostgreSQL
+                settings=True,  # Настройки PostgreSQL
                 costs=True     # Стоимость операций
             )
-            
+
             # Выполняем анализ
             analysis_result = analyzer.analyze_one(analysis_request)
-            
+
             # Сохраняем результат
             st.session_state['current_analysis'] = analysis_result
             st.session_state['current_plan'] = analysis_result.raw_explain_json
@@ -128,7 +238,7 @@ def _analyze_sql_query(dsn: str):
 
             # Сбрасываем флаг анализа
             st.session_state['analyze_query'] = False
-            
+
             # Закрываем подключение
             db_conn.close()
 
@@ -370,27 +480,27 @@ def _show_plan_metrics(plan_analysis: Dict[str, Any]):
 def _display_new_analysis_results(analysis_result: AnalysisResult):
     """Отображает результаты нового анализа."""
     st.markdown("### 📊 Результаты анализа")
-    
+
     # Отображаем JSON план
     with st.expander("📋 JSON план выполнения"):
         st.json(analysis_result.raw_explain_json)
-    
+
     # Отображаем проблемы
     if analysis_result.issues:
         st.markdown("#### ⚠️ Обнаруженные проблемы")
         for issue in analysis_result.issues:
             severity_color = {
                 "low": "🟡",
-                "medium": "🟠", 
+                "medium": "🟠",
                 "high": "🔴",
                 "critical": "🚨"
             }.get(issue.severity.value, "⚪")
-            
+
             st.markdown(f"{severity_color} **{issue.title}** ({issue.severity.value})")
             st.markdown(f"   {issue.details}")
             if issue.node_path:
                 st.markdown(f"   *Путь: {issue.node_path}*")
-    
+
     # Отображаем предложения
     if analysis_result.suggestions:
         st.markdown("#### 💡 Предложения по оптимизации")
@@ -399,13 +509,13 @@ def _display_new_analysis_results(analysis_result: AnalysisResult):
             st.markdown(f"   {suggestion.rationale}")
             if suggestion.fix:
                 st.code(suggestion.fix, language="sql")
-    
+
     # Отображаем кандидаты на индексы
     if analysis_result.index_candidates:
         st.markdown("#### 🗂️ Рекомендуемые индексы")
         for idx in analysis_result.index_candidates:
             st.code(idx.to_ddl(), language="sql")
-    
+
     # Отображаем Markdown отчет
     if analysis_result.markdown_report:
         with st.expander("📄 Подробный отчет"):
@@ -423,22 +533,25 @@ def _show_new_llm_analysis(analysis_result: AnalysisResult, sql_query: str, dsn:
 
     # Автоматически запускаем AI анализ если установлен флаг
     should_run_ai = st.session_state.get('run_ai_analysis', False)
-    
+
     if should_run_ai or st.button("🔍 Анализировать план с AI", type="primary"):
         with st.spinner("AI анализирует план выполнения..."):
             try:
                 # Подготавливаем данные для LLM
                 llm_payload = _prepare_analysis_for_llm(analysis_result, sql_query, dsn)
-                
+
                 # Получаем LLM клиент
                 llm_client = _get_llm_client()
-                
+
                 if llm_client:
                     # Выполняем LLM анализ
                     logger.info("Запуск LLM анализа...")
                     llm_result = run_llm(llm_client, llm_payload)
                     logger.info("LLM анализ завершен успешно")
-                    
+
+                    # Сохраняем результат в session_state
+                    st.session_state['llm_analysis_result'] = llm_result
+
                     # Отображаем результаты
                     _display_llm_analysis_results(llm_result)
                 else:
@@ -459,11 +572,11 @@ def _prepare_analysis_for_llm(analysis_result: AnalysisResult, sql_query: str, d
         sql_analyzer = SqlAnalyzer(sql_query)
         parser_output = sql_analyzer.get_tables_and_columns()
         normalized_sql = sql_analyzer.normalize()
-        
+
         # Получаем метаданные таблиц
         metadata_extractor = TableInfoExtractor(dsn)
         metadata = metadata_extractor.analyze(parser_output)
-        
+
         # Подготавливаем эвристики
         heuristics = {
             "issues": [
@@ -494,7 +607,7 @@ def _prepare_analysis_for_llm(analysis_result: AnalysisResult, sql_query: str, d
                 for idx in analysis_result.index_candidates
             ]
         }
-        
+
         return {
             "sql": sql_query,
             "normalized_sql": normalized_sql,
@@ -503,7 +616,7 @@ def _prepare_analysis_for_llm(analysis_result: AnalysisResult, sql_query: str, d
             "explain_json": analysis_result.raw_explain_json,
             "heuristics": heuristics
         }
-        
+
     except Exception as e:
         logger.error(f"Ошибка подготовки данных для LLM: {e}")
         return {
@@ -517,21 +630,35 @@ def _prepare_analysis_for_llm(analysis_result: AnalysisResult, sql_query: str, d
 
 
 def _get_llm_client():
-    """Получает LLM клиент на основе настроек."""
+    """Получает LLM клиент на основе настроек из sidebar."""
     try:
+        # Проверяем, включен ли AI
+        if not st.session_state.get('enable_ai', False):
+            return None
+
         ai_provider = st.session_state.get('ai_provider', 'openai')
-        
+
         if ai_provider.lower() == 'openai':
             import openai
             api_key = st.session_state.get('openai_api_key', '')
             if not api_key:
-                st.error("❌ OpenAI API ключ не настроен")
+                st.warning("⚠️ OpenAI API ключ не настроен. Настройте его в sidebar для использования AI анализа.")
                 return None
-            
-            client = openai.OpenAI(api_key=api_key)
+
+            # Создаем клиент с настройками прокси если включен
+            client_kwargs = {'api_key': api_key}
+
+            if st.session_state.get('enable_proxy', True):
+                proxy_host = st.session_state.get('proxy_host', 'localhost')
+                proxy_port = st.session_state.get('proxy_port', 1080)
+                client_kwargs['http_client'] = openai.HTTPClient(
+                    proxies=f"http://{proxy_host}:{proxy_port}"
+                )
+
+            client = openai.OpenAI(**client_kwargs)
             logger.info("✅ OpenAI клиент создан успешно")
             return client
-            
+
         elif ai_provider.lower() == 'anthropic':
             import anthropic
             api_key = st.session_state.get('anthropic_api_key', '')
@@ -541,24 +668,24 @@ def _get_llm_client():
             client = anthropic.Anthropic(api_key=api_key)
             logger.info("✅ Anthropic клиент создан успешно")
             return client
-            
+
         elif ai_provider.lower() == 'локальный llm':
             # Создаем простой клиент для локального LLM
             local_llm_url = st.session_state.get('local_llm_url', 'http://localhost:11434')
             local_llm_model = st.session_state.get('local_llm_model', 'llama3.1:8b')
-            
+
             # Создаем простой клиент для Ollama
             class LocalLLMClient:
                 def __init__(self, base_url, model):
                     self.base_url = base_url
                     self.model = model
-                
+
                 def chat(self):
                     return self
-                
+
                 def completions(self):
                     return self
-                
+
                 def create(self, **kwargs):
                     # Простая заглушка для локального LLM
                     return type('Response', (), {
@@ -568,15 +695,15 @@ def _get_llm_client():
                             })()
                         })()]
                     })()
-            
+
             client = LocalLLMClient(local_llm_url, local_llm_model)
             logger.info(f"✅ Локальный LLM клиент создан: {local_llm_url}/{local_llm_model}")
             return client
-            
+
         else:
             st.error(f"❌ Неподдерживаемый провайдер AI: {ai_provider}")
             return None
-            
+
     except Exception as e:
         logger.error(f"Ошибка создания LLM клиента: {e}")
         st.error(f"❌ Ошибка создания LLM клиента: {str(e)}")
@@ -586,7 +713,7 @@ def _get_llm_client():
 def _display_llm_analysis_results(llm_result: Dict[str, Any]):
     """Отображает результаты LLM анализа."""
     st.markdown("#### 🎯 AI Рекомендации")
-    
+
     # Проблемы
     if llm_result.get('problems'):
         st.markdown("##### 🚨 Критические проблемы")
@@ -594,20 +721,20 @@ def _display_llm_analysis_results(llm_result: Dict[str, Any]):
             severity_icon = {
                 "low": "🟡",
                 "medium": "🟠",
-                "high": "🔴", 
+                "high": "🔴",
                 "critical": "🚨"
             }.get(problem.get('severity', 'low'), "⚪")
-            
+
             st.markdown(f"{severity_icon} **{problem.get('title', 'Проблема')}**")
             st.markdown(f"   {problem.get('details', '')}")
-    
+
     # Предупреждения
     if llm_result.get('warnings'):
         st.markdown("##### ⚠️ Предупреждения")
         for warning in llm_result['warnings']:
             st.markdown(f"⚠️ **{warning.get('title', 'Предупреждение')}**")
             st.markdown(f"   {warning.get('details', '')}")
-    
+
     # Рекомендации
     if llm_result.get('recommendations'):
         st.markdown("##### 💡 Рекомендации")
@@ -619,18 +746,16 @@ def _display_llm_analysis_results(llm_result: Dict[str, Any]):
                         st.code(action['sql'], language="sql")
                     if action.get('note'):
                         st.markdown(f"   *{action['note']}*")
-    
+
     # Исправленный SQL
     if llm_result.get('fixed_sql'):
         st.markdown("##### 🔧 Оптимизированный SQL")
         st.code(llm_result['fixed_sql'], language="sql")
-    
+
     # Сырой ответ (для отладки)
     if llm_result.get('raw_content'):
         with st.expander("🔍 Сырой ответ LLM"):
             st.text(llm_result['raw_content'])
-
-
 
 
 def _show_plan_comparison():

@@ -149,9 +149,9 @@ class CacheManager:
         """Возвращает статистику кэша."""
         total_requests = self.stats['hits'] + self.stats['misses']
         hit_rate = (
-            self.stats['hits'] /
-            total_requests *
-            100) if total_requests > 0 else 0
+            self.stats['hits']
+            / total_requests
+            * 100) if total_requests > 0 else 0
 
         return {
             'hits': self.stats['hits'],

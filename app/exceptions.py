@@ -9,12 +9,12 @@ from typing import Optional, Dict, Any, List
 
 class SQLAnalyzerError(Exception):
     """Базовое исключение для SQL Analyzer."""
-    
+
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.message = message
         self.details = details or {}
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Преобразует исключение в словарь."""
         return {
@@ -26,7 +26,7 @@ class SQLAnalyzerError(Exception):
 
 class ValidationError(SQLAnalyzerError):
     """Исключение валидации входных данных."""
-    
+
     def __init__(self, message: str, validation_errors: List[str], warnings: Optional[List[str]] = None):
         super().__init__(message)
         self.validation_errors = validation_errors
@@ -39,7 +39,7 @@ class ValidationError(SQLAnalyzerError):
 
 class DatabaseConnectionError(SQLAnalyzerError):
     """Исключение подключения к базе данных."""
-    
+
     def __init__(self, message: str, dsn: Optional[str] = None, original_error: Optional[Exception] = None):
         super().__init__(message)
         self.dsn = dsn
@@ -52,7 +52,7 @@ class DatabaseConnectionError(SQLAnalyzerError):
 
 class SQLExecutionError(SQLAnalyzerError):
     """Исключение выполнения SQL запроса."""
-    
+
     def __init__(self, message: str, sql: Optional[str] = None, original_error: Optional[Exception] = None):
         super().__init__(message)
         self.sql = sql
@@ -65,7 +65,7 @@ class SQLExecutionError(SQLAnalyzerError):
 
 class PlanParsingError(SQLAnalyzerError):
     """Исключение парсинга плана выполнения."""
-    
+
     def __init__(self, message: str, plan_data: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.plan_data = plan_data
@@ -77,8 +77,8 @@ class PlanParsingError(SQLAnalyzerError):
 
 class LLMIntegrationError(SQLAnalyzerError):
     """Исключение интеграции с LLM."""
-    
-    def __init__(self, message: str, provider: Optional[str] = None, 
+
+    def __init__(self, message: str, provider: Optional[str] = None,
                  api_error: Optional[Exception] = None):
         super().__init__(message)
         self.provider = provider
@@ -91,8 +91,8 @@ class LLMIntegrationError(SQLAnalyzerError):
 
 class ConfigurationError(SQLAnalyzerError):
     """Исключение конфигурации."""
-    
-    def __init__(self, message: str, config_key: Optional[str] = None, 
+
+    def __init__(self, message: str, config_key: Optional[str] = None,
                  invalid_value: Optional[Any] = None):
         super().__init__(message)
         self.config_key = config_key
@@ -106,8 +106,8 @@ class ConfigurationError(SQLAnalyzerError):
 
 class HealthCheckError(SQLAnalyzerError):
     """Исключение проверки здоровья системы."""
-    
-    def __init__(self, message: str, component: Optional[str] = None, 
+
+    def __init__(self, message: str, component: Optional[str] = None,
                  check_details: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.component = component
@@ -120,8 +120,8 @@ class HealthCheckError(SQLAnalyzerError):
 
 class BackupError(SQLAnalyzerError):
     """Исключение операций резервного копирования."""
-    
-    def __init__(self, message: str, operation: Optional[str] = None, 
+
+    def __init__(self, message: str, operation: Optional[str] = None,
                  backup_path: Optional[str] = None):
         super().__init__(message)
         self.operation = operation
@@ -134,7 +134,7 @@ class BackupError(SQLAnalyzerError):
 
 class MetricsError(SQLAnalyzerError):
     """Исключение сбора метрик."""
-    
+
     def __init__(self, message: str, metric_name: Optional[str] = None):
         super().__init__(message)
         self.metric_name = metric_name
@@ -148,7 +148,7 @@ class MetricsError(SQLAnalyzerError):
 def handle_database_error(error: Exception, dsn: Optional[str] = None) -> DatabaseConnectionError:
     """Обрабатывает ошибки базы данных."""
     error_message = str(error)
-    
+
     # Определяем тип ошибки по сообщению
     if "connection refused" in error_message.lower():
         message = "Не удалось подключиться к базе данных. Проверьте, что PostgreSQL запущен и доступен."
@@ -160,14 +160,14 @@ def handle_database_error(error: Exception, dsn: Optional[str] = None) -> Databa
         message = "Превышено время ожидания подключения к базе данных."
     else:
         message = f"Ошибка подключения к базе данных: {error_message}"
-    
+
     return DatabaseConnectionError(message, dsn, error)
 
 
 def handle_sql_error(error: Exception, sql: Optional[str] = None) -> SQLExecutionError:
     """Обрабатывает ошибки выполнения SQL."""
     error_message = str(error)
-    
+
     # Определяем тип ошибки SQL
     if "syntax error" in error_message.lower():
         message = "Синтаксическая ошибка в SQL запросе."
@@ -179,14 +179,14 @@ def handle_sql_error(error: Exception, sql: Optional[str] = None) -> SQLExecutio
         message = "Недостаточно прав для выполнения запроса."
     else:
         message = f"Ошибка выполнения SQL: {error_message}"
-    
+
     return SQLExecutionError(message, sql, error)
 
 
 def handle_llm_error(error: Exception, provider: Optional[str] = None) -> LLMIntegrationError:
     """Обрабатывает ошибки LLM."""
     error_message = str(error)
-    
+
     if "api key" in error_message.lower():
         message = f"Ошибка API ключа для {provider or 'LLM'}. Проверьте правильность ключа."
     elif "rate limit" in error_message.lower():
@@ -197,7 +197,7 @@ def handle_llm_error(error: Exception, provider: Optional[str] = None) -> LLMInt
         message = f"Превышено время ожидания ответа от {provider or 'LLM'}."
     else:
         message = f"Ошибка интеграции с {provider or 'LLM'}: {error_message}"
-    
+
     return LLMIntegrationError(message, provider, error)
 
 
@@ -216,29 +216,29 @@ def safe_execute(func, *args, error_handler=None, default_return=None, **kwargs)
 
 class ErrorContext:
     """Контекст для отслеживания ошибок."""
-    
+
     def __init__(self, operation: str, **context_data):
         self.operation = operation
         self.context_data = context_data
         self.errors = []
         self.warnings = []
-    
+
     def add_error(self, error: str):
         """Добавляет ошибку в контекст."""
         self.errors.append(error)
-    
+
     def add_warning(self, warning: str):
         """Добавляет предупреждение в контекст."""
         self.warnings.append(warning)
-    
+
     def has_errors(self) -> bool:
         """Проверяет наличие ошибок."""
         return len(self.errors) > 0
-    
+
     def has_warnings(self) -> bool:
         """Проверяет наличие предупреждений."""
         return len(self.warnings) > 0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Преобразует контекст в словарь."""
         return {
@@ -247,10 +247,10 @@ class ErrorContext:
             'errors': self.errors,
             'warnings': self.warnings
         }
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None and not isinstance(exc_val, SQLAnalyzerError):
             # Преобразуем обычные исключения в наши кастомные

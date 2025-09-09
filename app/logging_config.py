@@ -9,13 +9,12 @@ import logging.config
 import sys
 import json
 from datetime import datetime
-from typing import Dict, Any
 from pathlib import Path
 
 
 class JSONFormatter(logging.Formatter):
     """Форматтер для JSON логов."""
-    
+
     def format(self, record):
         log_entry = {
             'timestamp': datetime.fromtimestamp(record.created).isoformat(),
@@ -26,7 +25,7 @@ class JSONFormatter(logging.Formatter):
             'function': record.funcName,
             'line': record.lineno
         }
-        
+
         # Добавляем дополнительные поля если есть
         if hasattr(record, 'sql'):
             log_entry['sql'] = record.sql
@@ -36,17 +35,17 @@ class JSONFormatter(logging.Formatter):
             log_entry['user_id'] = record.user_id
         if hasattr(record, 'request_id'):
             log_entry['request_id'] = record.request_id
-        
+
         # Добавляем информацию об исключении если есть
         if record.exc_info:
             log_entry['exception'] = self.formatException(record.exc_info)
-        
+
         return json.dumps(log_entry, ensure_ascii=False)
 
 
 class ColoredFormatter(logging.Formatter):
     """Цветной форматтер для консольного вывода."""
-    
+
     # ANSI цветовые коды
     COLORS = {
         'DEBUG': '\033[36m',     # Cyan
@@ -56,15 +55,15 @@ class ColoredFormatter(logging.Formatter):
         'CRITICAL': '\033[35m',  # Magenta
         'RESET': '\033[0m'       # Reset
     }
-    
+
     def format(self, record):
         # Добавляем цвет к уровню логирования
         level_color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
         record.levelname = f"{level_color}{record.levelname}{self.COLORS['RESET']}"
-        
+
         # Форматируем сообщение
         formatted = super().format(record)
-        
+
         return formatted
 
 
@@ -77,7 +76,7 @@ def setup_logging(
 ) -> None:
     """
     Настраивает логирование для приложения.
-    
+
     Args:
         level: Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         log_to_file: Логировать в файл
@@ -85,11 +84,11 @@ def setup_logging(
         json_format: Использовать JSON формат для файлов
         log_dir: Директория для лог файлов
     """
-    
+
     # Создаем директорию для логов
     log_path = Path(log_dir)
     log_path.mkdir(exist_ok=True)
-    
+
     # Базовая конфигурация
     config = {
         'version': 1,
@@ -154,7 +153,7 @@ def setup_logging(
             'handlers': []
         }
     }
-    
+
     # Настраиваем консольный хэндлер
     if log_to_console:
         config['handlers']['console'] = {
@@ -165,7 +164,7 @@ def setup_logging(
         }
         config['loggers']['app']['handlers'].append('console')
         config['root']['handlers'].append('console')
-    
+
     # Настраиваем файловые хэндлеры
     if log_to_file:
         # Основной лог файл
@@ -179,7 +178,7 @@ def setup_logging(
             'encoding': 'utf-8'
         }
         config['loggers']['app']['handlers'].append('file')
-        
+
         # Лог файл для ошибок
         config['handlers']['error_file'] = {
             'class': 'logging.handlers.RotatingFileHandler',
@@ -192,7 +191,7 @@ def setup_logging(
         }
         config['loggers']['app']['handlers'].append('error_file')
         config['root']['handlers'].append('error_file')
-        
+
         # Лог файл для SQL запросов
         config['handlers']['sql_file'] = {
             'class': 'logging.handlers.RotatingFileHandler',
@@ -203,14 +202,14 @@ def setup_logging(
             'level': 'DEBUG',
             'encoding': 'utf-8'
         }
-        
+
         # Отдельный логгер для SQL
         config['loggers']['app.sql'] = {
             'level': 'DEBUG',
             'handlers': ['sql_file'],
             'propagate': False
         }
-        
+
         # Лог файл для метрик
         config['handlers']['metrics_file'] = {
             'class': 'logging.handlers.RotatingFileHandler',
@@ -221,9 +220,9 @@ def setup_logging(
             'level': 'INFO',
             'encoding': 'utf-8'
         }
-        
+
         config['loggers']['app.metrics']['handlers'] = ['metrics_file']
-    
+
     # Применяем конфигурацию
     logging.config.dictConfig(config)
 
@@ -231,21 +230,21 @@ def setup_logging(
 def get_logger(name: str) -> logging.Logger:
     """
     Получает настроенный логгер.
-    
+
     Args:
         name: Имя логгера (обычно __name__)
-    
+
     Returns:
         Настроенный логгер
     """
     return logging.getLogger(name)
 
 
-def log_sql_query(logger: logging.Logger, sql: str, execution_time: float = None, 
+def log_sql_query(logger: logging.Logger, sql: str, execution_time: float = None,
                   success: bool = True, error: str = None, **kwargs):
     """
     Логирует SQL запрос со специальными атрибутами.
-    
+
     Args:
         logger: Логгер
         sql: SQL запрос
@@ -256,7 +255,7 @@ def log_sql_query(logger: logging.Logger, sql: str, execution_time: float = None
     """
     # Создаем специальный SQL логгер если его нет
     sql_logger = logging.getLogger('app.sql')
-    
+
     # Подготавливаем дополнительные атрибуты
     extra_attrs = {
         'sql': sql[:1000] + '...' if len(sql) > 1000 else sql,  # Обрезаем длинные запросы
@@ -264,13 +263,13 @@ def log_sql_query(logger: logging.Logger, sql: str, execution_time: float = None
         'success': success,
         **kwargs
     }
-    
+
     if execution_time is not None:
         extra_attrs['execution_time'] = execution_time
-    
+
     if error:
         extra_attrs['error'] = error
-    
+
     # Логируем
     if success:
         if execution_time and execution_time > 1.0:  # Медленный запрос
@@ -281,12 +280,12 @@ def log_sql_query(logger: logging.Logger, sql: str, execution_time: float = None
         sql_logger.error("Ошибка выполнения SQL запроса", extra=extra_attrs)
 
 
-def log_llm_request(logger: logging.Logger, provider: str, operation: str, 
-                   response_time: float = None, success: bool = True, 
-                   error: str = None, **kwargs):
+def log_llm_request(logger: logging.Logger, provider: str, operation: str,
+                    response_time: float = None, success: bool = True,
+                    error: str = None, **kwargs):
     """
     Логирует запрос к LLM.
-    
+
     Args:
         logger: Логгер
         provider: Провайдер LLM
@@ -302,24 +301,24 @@ def log_llm_request(logger: logging.Logger, provider: str, operation: str,
         'success': success,
         **kwargs
     }
-    
+
     if response_time is not None:
         extra_attrs['response_time'] = response_time
-    
+
     if error:
         extra_attrs['error'] = error
-    
+
     if success:
         logger.info(f"LLM запрос к {provider} выполнен", extra=extra_attrs)
     else:
         logger.error(f"Ошибка LLM запроса к {provider}", extra=extra_attrs)
 
 
-def log_performance_metric(logger: logging.Logger, metric_name: str, 
-                          value: float, **kwargs):
+def log_performance_metric(logger: logging.Logger, metric_name: str,
+                           value: float, **kwargs):
     """
     Логирует метрику производительности.
-    
+
     Args:
         logger: Логгер
         metric_name: Название метрики
@@ -327,14 +326,14 @@ def log_performance_metric(logger: logging.Logger, metric_name: str,
         **kwargs: Дополнительные атрибуты
     """
     metrics_logger = logging.getLogger('app.metrics')
-    
+
     extra_attrs = {
         'metric_name': metric_name,
         'metric_value': value,
         'timestamp': datetime.now().isoformat(),
         **kwargs
     }
-    
+
     metrics_logger.info(f"Метрика: {metric_name} = {value}", extra=extra_attrs)
 
 
@@ -352,31 +351,31 @@ def init_default_logging():
 # Контекстный менеджер для логирования операций
 class LoggingContext:
     """Контекстный менеджер для логирования операций."""
-    
+
     def __init__(self, logger: logging.Logger, operation: str, **context):
         self.logger = logger
         self.operation = operation
         self.context = context
         self.start_time = None
-    
+
     def __enter__(self):
         self.start_time = datetime.now()
         self.logger.info(f"Начало операции: {self.operation}", extra=self.context)
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         end_time = datetime.now()
         duration = (end_time - self.start_time).total_seconds()
-        
+
         context_with_duration = {
             **self.context,
             'duration': duration
         }
-        
+
         if exc_type is None:
             self.logger.info(f"Операция завершена: {self.operation}", extra=context_with_duration)
         else:
             context_with_duration['error'] = str(exc_val)
             self.logger.error(f"Операция завершена с ошибкой: {self.operation}", extra=context_with_duration)
-        
+
         return False  # Не подавляем исключения

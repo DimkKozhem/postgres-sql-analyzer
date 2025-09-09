@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import Dict, Any, List
+from typing import Dict, Any
 import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -17,28 +17,28 @@ logger = logging.getLogger(__name__)
 def show_statistics_tab(dsn: str, mock_mode: bool = False):
     """Отображает вкладку 'Статистика'."""
     st.markdown("## 📊 Статистика")
-    
+
     if mock_mode:
         st.info("🎭 Mock режим: отображаются тестовые данные")
         _show_mock_statistics()
         return
-    
+
     try:
         # Получаем статистику
         stats_data = _get_statistics_data(dsn)
-        
+
         # Отображаем общую статистику
         _show_general_statistics(stats_data)
-        
+
         # Отображаем статистику запросов
         _show_query_statistics(stats_data)
-        
+
         # Отображаем статистику подключений
         _show_connection_statistics(stats_data)
-        
+
         # Отображаем графики нагрузки
         _show_load_charts(stats_data)
-        
+
     except Exception as e:
         st.error(f"Ошибка получения статистики: {str(e)}")
         logger.error(f"Ошибка в show_statistics_tab: {e}")
@@ -52,11 +52,11 @@ def _get_statistics_data(dsn: str) -> Dict[str, Any]:
         'connections': [],
         'load_metrics': []
     }
-    
+
     try:
         # Подключаемся к базе данных
         conn = psycopg2.connect(dsn, cursor_factory=RealDictCursor)
-        
+
         with conn.cursor() as cur:
             # Общая статистика
             cur.execute("""
@@ -69,7 +69,7 @@ def _get_statistics_data(dsn: str) -> Dict[str, Any]:
             result = cur.fetchone()
             if result:
                 stats_data['general'] = dict(result)
-            
+
             # Статистика запросов (PostgreSQL 17 совместимость)
             cur.execute("""
                 SELECT 
@@ -92,7 +92,7 @@ def _get_statistics_data(dsn: str) -> Dict[str, Any]:
             """)
             queries = cur.fetchall()
             stats_data['queries'] = [dict(query) for query in queries]
-            
+
             # Статистика подключений
             cur.execute("""
                 SELECT 
@@ -111,7 +111,7 @@ def _get_statistics_data(dsn: str) -> Dict[str, Any]:
             """)
             connections = cur.fetchall()
             stats_data['connections'] = [dict(conn) for conn in connections]
-            
+
             # Метрики нагрузки из pg_stat_statements
             cur.execute("""
                 SELECT 
@@ -129,43 +129,43 @@ def _get_statistics_data(dsn: str) -> Dict[str, Any]:
             """)
             load_metrics = cur.fetchall()
             stats_data['load_metrics'] = [dict(metric) for metric in load_metrics]
-            
+
         conn.close()
-                
+
     except Exception as e:
         logger.error(f"Ошибка получения статистики: {e}")
         # Возвращаем пустые данные вместо исключения
         pass
-    
+
     return stats_data
 
 
 def _show_general_statistics(stats_data: Dict[str, Any]):
     """Отображает общую статистику."""
     st.markdown("### 📈 Общая статистика")
-    
+
     general = stats_data.get('general', {})
-    
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         st.metric(
             label="🔗 Активные подключения",
             value=general.get('active_connections', 0)
         )
-    
+
     with col2:
         st.metric(
             label="⚡ Активные запросы",
             value=general.get('active_queries', 0)
         )
-    
+
     with col3:
         st.metric(
             label="😴 Неактивные подключения",
             value=general.get('idle_connections', 0)
         )
-    
+
     with col4:
         st.metric(
             label="⏳ В транзакции",
@@ -176,24 +176,24 @@ def _show_general_statistics(stats_data: Dict[str, Any]):
 def _show_query_statistics(stats_data: Dict[str, Any]):
     """Отображает статистику запросов."""
     st.markdown("### 🔍 Статистика запросов")
-    
+
     queries = stats_data.get('queries', [])
-    
+
     if not queries:
         st.info("ℹ️ Нет данных о запросах (pg_stat_statements не доступен)")
         return
-    
+
     # Создаем DataFrame
     queries_df = pd.DataFrame(queries)
-    
+
     # Топ запросов по времени выполнения
     if not queries_df.empty:
         st.markdown("#### ⏱️ Топ запросов по времени выполнения")
-        
+
         # Создаем график времени выполнения
         top_queries = queries_df.head(10).copy()
         top_queries['query_short'] = top_queries['query'].str[:50] + '...'
-        
+
         fig_time = px.bar(
             top_queries,
             x='mean_exec_time',
@@ -217,18 +217,18 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
             textfont=dict(size=13, color='white', family='Arial')  # Белые цифры, увеличенный размер
         )
         st.plotly_chart(fig_time, width='stretch')
-        
+
         # Топ запросов по количеству вызовов
         st.markdown("#### 📞 Топ запросов по количеству вызовов")
-        
+
         # Создаем улучшенный график с дополнительной информацией
         calls_queries = queries_df.head(10).copy()
         calls_queries['query_short'] = calls_queries['query'].str[:45] + '...'
-        
+
         # Добавляем процент от общего количества вызовов
         total_calls = calls_queries['calls'].sum()
         calls_queries['calls_percentage'] = (calls_queries['calls'] / total_calls * 100).round(1)
-        
+
         # Создаем график с дополнительными метриками
         fig_calls = px.bar(
             calls_queries,
@@ -240,7 +240,7 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
             color='calls',
             color_continuous_scale='Blues'
         )
-        
+
         # Улучшаем отображение
         fig_calls.update_layout(
             height=600,
@@ -250,27 +250,27 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
             font=dict(size=12),
             margin=dict(l=20, r=100, t=50, b=50)  # Увеличиваем отступы для текста
         )
-        
+
         # Обновляем подсказки с дополнительной информацией
         fig_calls.update_traces(
-            hovertemplate='<b>%{y}</b><br>' +
-                         'Вызовов: %{x:,}<br>' +
-                         'Процент от общего: %{customdata[0]}%<br>' +
-                         'Среднее время: %{customdata[1]:.1f} мс<br>' +
-                         'Общее время: %{customdata[2]:.1f} мс<extra></extra>',
+            hovertemplate='<b>%{y}</b><br>'
+            + 'Вызовов: %{x:,}<br>'
+            + 'Процент от общего: %{customdata[0]}%<br>'
+            + 'Среднее время: %{customdata[1]:.1f} мс<br>'
+            + 'Общее время: %{customdata[2]:.1f} мс<extra></extra>',
             customdata=list(zip(
                 calls_queries['calls_percentage'],
                 calls_queries['mean_exec_time'],
                 calls_queries['total_exec_time']
             ))
         )
-        
+
         # Убираем цифры с количеством, оставляем только проценты
         fig_calls.update_traces(
             text=None,  # Убираем текст с количеством
             textposition=None
         )
-        
+
         # Добавляем аннотации только с процентами
         max_calls = max(calls_queries['calls'])
         for i, row in calls_queries.iterrows():
@@ -285,16 +285,16 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 bordercolor='rgba(0,0,0,0.3)',
                 borderwidth=1
             )
-        
+
         st.plotly_chart(fig_calls, width='stretch')
-        
+
         # Добавляем круговую диаграмму распределения вызовов
         st.markdown("##### 🥧 Распределение вызовов")
-        
+
         # Создаем круговую диаграмму для топ-5 запросов
         pie_data = calls_queries.head(5).copy()
         pie_data['query_label'] = pie_data['query'].str[:30] + '...'
-        
+
         fig_pie = px.pie(
             pie_data,
             values='calls',
@@ -302,16 +302,16 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
             title="Топ-5 запросов по количеству вызовов",
             color_discrete_sequence=px.colors.qualitative.Set3
         )
-        
+
         fig_pie.update_traces(
             textposition='inside',
             textinfo='percent+label',
             textfont=dict(size=14, family='Arial'),  # Увеличиваем размер надписей
-            hovertemplate='<b>%{label}</b><br>' +
-                         'Вызовов: %{value}<br>' +
-                         'Процент: %{percent}<extra></extra>'
+            hovertemplate='<b>%{label}</b><br>'
+                         + 'Вызовов: %{value}<br>'
+                         + 'Процент: %{percent}<extra></extra>'
         )
-        
+
         fig_pie.update_layout(
             height=500,  # Увеличиваем высоту диаграммы
             showlegend=True,
@@ -325,12 +325,12 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 font=dict(size=12, family='Arial')  # Увеличиваем размер легенды
             )
         )
-        
+
         st.plotly_chart(fig_pie, width='stretch')
-        
+
         # Добавляем дополнительную статистику по вызовам
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             most_called = calls_queries.iloc[0]
             st.metric(
@@ -338,7 +338,7 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 f"{most_called['calls']:,} вызовов",
                 help=f"Среднее время: {most_called['mean_exec_time']:.1f} мс"
             )
-        
+
         with col2:
             avg_calls = calls_queries['calls'].mean()
             st.metric(
@@ -346,7 +346,7 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 f"{avg_calls:.0f}",
                 help="Среднее по топ-10 запросам"
             )
-        
+
         with col3:
             top_3_percentage = calls_queries.head(3)['calls_percentage'].sum()
             st.metric(
@@ -354,28 +354,28 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 f"{top_3_percentage:.1f}% от общего",
                 help="Процент вызовов от топ-3 запросов"
             )
-        
+
         # Таблица с детальной информацией
         st.markdown("#### 📋 Детальная статистика запросов")
-        
+
         # Создаем улучшенную таблицу
         display_df = queries_df.copy()
-        
+
         # Сокращаем длинные запросы для отображения
         display_df['query_short'] = display_df['query'].str[:80] + '...'
-        
+
         # Добавляем вычисляемые колонки
-        display_df['cache_hit_ratio'] = (display_df['shared_blks_hit'] / 
-                                        (display_df['shared_blks_hit'] + display_df['shared_blks_read'] + 1) * 100).round(1)
+        display_df['cache_hit_ratio'] = (display_df['shared_blks_hit']
+                                         / (display_df['shared_blks_hit'] + display_df['shared_blks_read'] + 1) * 100).round(1)
         display_df['total_time_minutes'] = (display_df['total_exec_time'] / 1000 / 60).round(2)
         display_df['avg_rows_per_call'] = (display_df['rows'] / display_df['calls']).round(0)
-        
+
         # Сортируем по общему времени выполнения
         display_df = display_df.sort_values('total_exec_time', ascending=False)
-        
+
         # Отображаем таблицу с улучшенной конфигурацией
         st.dataframe(
-            display_df[['query_short', 'calls', 'total_time_minutes', 'mean_exec_time', 
+            display_df[['query_short', 'calls', 'total_time_minutes', 'mean_exec_time',
                        'avg_rows_per_call', 'cache_hit_ratio', 'shared_blks_hit', 'shared_blks_read']],
             width='stretch',
             hide_index=True,
@@ -422,32 +422,32 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
                 )
             }
         )
-        
+
         # Добавляем сводную статистику
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             total_calls = display_df['calls'].sum()
             st.metric("📞 Общее количество вызовов", f"{total_calls:,}")
-        
+
         with col2:
             total_time_minutes = display_df['total_time_minutes'].sum()
             total_time_hours = total_time_minutes / 60
-            
+
             # Показываем в часах, если больше 1 часа, иначе в минутах
             if total_time_hours >= 1:
                 st.metric("⏱️ Общее время выполнения", f"{total_time_hours:.1f} ч")
             else:
                 st.metric("⏱️ Общее время выполнения", f"{total_time_minutes:.1f} мин")
-        
+
         with col3:
             avg_cache_hit = display_df['cache_hit_ratio'].mean()
             st.metric("💾 Средний кэш хит", f"{avg_cache_hit:.1f}%")
-        
+
         with col4:
             slowest_query_time = display_df['mean_exec_time'].max()
             st.metric("🐌 Самый медленный запрос", f"{slowest_query_time:.1f} мс")
-        
+
         # LLM анализ запросов
         _show_llm_query_analysis(queries_df)
 
@@ -455,34 +455,34 @@ def _show_query_statistics(stats_data: Dict[str, Any]):
 def _show_connection_statistics(stats_data: Dict[str, Any]):
     """Отображает статистику подключений."""
     st.markdown("### 🔗 Статистика подключений")
-    
+
     connections = stats_data.get('connections', [])
-    
+
     if not connections:
         st.info("ℹ️ Нет данных о подключениях")
         return
-    
+
     # Создаем DataFrame
     connections_df = pd.DataFrame(connections)
-    
+
     # Статистика по состояниям
     if not connections_df.empty:
         st.markdown("#### 📊 Подключения по состояниям")
-        
+
         state_counts = connections_df['state'].value_counts()
-        
+
         fig_states = px.pie(
             values=state_counts.values,
             names=state_counts.index,
             title="Распределение подключений по состояниям"
         )
         st.plotly_chart(fig_states, width='stretch')
-        
+
         # Таблица активных подключений
         st.markdown("#### 📋 Активные подключения")
-        
+
         active_connections = connections_df[connections_df['state'] == 'active']
-        
+
         if not active_connections.empty:
             # Улучшаем отображение времени
             display_connections = active_connections.copy()
@@ -492,13 +492,13 @@ def _show_connection_statistics(stats_data: Dict[str, Any]):
             display_connections['query_duration'] = (
                 current_time - query_start_times
             ).dt.total_seconds().round(1)
-            
+
             # Сокращаем длинные запросы
             display_connections['query_short'] = display_connections['query'].str[:60] + '...'
-            
+
             st.dataframe(
-                display_connections[['datname', 'usename', 'application_name', 'client_addr', 
-                                   'query_duration', 'query_short']],
+                display_connections[['datname', 'usename', 'application_name', 'client_addr',
+                                     'query_duration', 'query_short']],
                 width='stretch',
                 hide_index=True,
                 column_config={
@@ -536,24 +536,24 @@ def _show_connection_statistics(stats_data: Dict[str, Any]):
             )
         else:
             st.info("ℹ️ Нет активных подключений")
-        
+
         # Сводная статистика подключений
         st.markdown("#### 📊 Сводная статистика подключений")
-        
+
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             total_connections = len(connections_df)
             st.metric("🔗 Всего подключений", total_connections)
-        
+
         with col2:
             active_count = len(connections_df[connections_df['state'] == 'active'])
             st.metric("⚡ Активных", active_count)
-        
+
         with col3:
             idle_count = len(connections_df[connections_df['state'] == 'idle'])
             st.metric("😴 Неактивных", idle_count)
-        
+
         with col4:
             idle_in_transaction = len(connections_df[connections_df['state'] == 'idle in transaction'])
             st.metric("⏳ В транзакции", idle_in_transaction)
@@ -562,28 +562,28 @@ def _show_connection_statistics(stats_data: Dict[str, Any]):
 def _show_load_charts(stats_data: Dict[str, Any]):
     """Строит графики нагрузки."""
     st.markdown("### 📈 Графики нагрузки")
-    
+
     # Создаем mock данные для демонстрации
     import numpy as np
-    
+
     # Генерируем данные за последние 24 часа
     hours = 24
     timestamps = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
-    
+
     # Mock данные нагрузки
     cpu_usage = np.random.normal(45, 15, hours)
     cpu_usage = np.clip(cpu_usage, 0, 100)
-    
+
     memory_usage = np.random.normal(60, 10, hours)
     memory_usage = np.clip(memory_usage, 0, 100)
-    
+
     # Создаем DataFrame
     load_df = pd.DataFrame({
         'timestamp': timestamps,
         'cpu_usage': cpu_usage,
         'memory_usage': memory_usage
     })
-    
+
     # График нагрузки CPU
     fig_cpu = go.Figure()
     fig_cpu.add_trace(go.Scatter(
@@ -600,7 +600,7 @@ def _show_load_charts(stats_data: Dict[str, Any]):
         height=300
     )
     st.plotly_chart(fig_cpu, width='stretch')
-    
+
     # График использования памяти
     fig_memory = go.Figure()
     fig_memory.add_trace(go.Scatter(
@@ -622,23 +622,23 @@ def _show_load_charts(stats_data: Dict[str, Any]):
 def _show_mock_statistics():
     """Отображает mock статистику."""
     st.markdown("### 📈 Общая статистика (Mock)")
-    
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         st.metric(label="🔗 Активные подключения", value=12)
-    
+
     with col2:
         st.metric(label="⚡ Активные запросы", value=3)
-    
+
     with col3:
         st.metric(label="😴 Неактивные подключения", value=8)
-    
+
     with col4:
         st.metric(label="⏳ В транзакции", value=1)
-    
+
     st.markdown("### 🔍 Статистика запросов (Mock)")
-    
+
     # Mock данные запросов
     mock_queries = pd.DataFrame({
         'query': [
@@ -653,11 +653,11 @@ def _show_mock_statistics():
         'mean_time': [10.0, 10.0, 10.0, 10.0, 10.0],
         'rows': [1250, 890, 450, 320, 180]
     })
-    
+
     st.dataframe(mock_queries, width='stretch', hide_index=True)
-    
+
     st.markdown("### 🔗 Статистика подключений (Mock)")
-    
+
     # Mock данные подключений
     mock_sessions = pd.DataFrame({
         'datname': ['postgres', 'postgres', 'postgres', 'postgres'],
@@ -672,19 +672,19 @@ def _show_mock_statistics():
             datetime.now() - timedelta(minutes=15)
         ]
     })
-    
+
     st.dataframe(mock_sessions, width='stretch', hide_index=True)
-    
+
     st.markdown("### 📈 Графики нагрузки (Mock)")
-    
+
     # Mock график
     import numpy as np
-    
+
     hours = 24
     timestamps = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
     cpu_usage = np.random.normal(45, 15, hours)
     cpu_usage = np.clip(cpu_usage, 0, 100)
-    
+
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=timestamps,
@@ -703,20 +703,21 @@ def _show_mock_statistics():
 
 
 def _show_llm_query_analysis(queries_df: pd.DataFrame):
-    """Отображает LLM анализ запросов."""
+    """Отображает LLM анализ запросов в автоматическом режиме."""
     st.markdown("#### 🤖 AI Анализ запросов")
-    
+
     # Проверяем настройки AI
     if not st.session_state.get('enable_ai', False):
         st.info("ℹ️ AI анализ отключен. Включите AI в настройках для анализа запросов.")
         return
-    
-    if st.button("🔍 Анализировать запросы с помощью AI", type="primary"):
+
+    # Автоматический анализ при загрузке страницы
+    if 'statistics_analyzed' not in st.session_state:
         with st.spinner("🤖 AI анализирует запросы..."):
             try:
                 import asyncio
                 from app.llm_integration import LLMIntegration
-                
+
                 # Проверяем наличие API ключа
                 api_key = st.session_state.get('openai_api_key', '')
                 if not api_key:
@@ -726,7 +727,6 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
 1. Откройте sidebar (левая панель)
 2. Найдите раздел "🤖 AI настройки"
 3. Введите ваш OpenAI API ключ в поле "OpenAI API ключ"
-4. Нажмите кнопку "🔍 Анализировать запросы с помощью AI" снова
 
 🔗 **Где получить API ключ:**
 - Перейдите на https://platform.openai.com/api-keys
@@ -735,11 +735,12 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
 
 ⚙️ **Текущие настройки:**
 - Модель: {st.session_state.get('openai_model', 'gpt-4o-mini')}""")
+                    st.session_state['statistics_analyzed'] = True
                     return
-                
+
                 # Берем топ-5 самых медленных запросов для анализа
                 top_queries = queries_df.head(5)
-                
+
                 # Подготавливаем данные для анализа
                 analysis_data = []
                 for _, row in top_queries.iterrows():
@@ -752,7 +753,7 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
                         'shared_blks_hit': row['shared_blks_hit'],
                         'shared_blks_read': row['shared_blks_read']
                     })
-                
+
                 # Создаем промпт для анализа
                 prompt = f"""
                 Проанализируй следующие медленные запросы PostgreSQL и дай рекомендации по оптимизации.
@@ -771,26 +772,26 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
                 
                 Дай 3-5 рекомендаций по оптимизации самых медленных запросов.
                 """
-                
+
                 # Инициализируем LLM
                 llm_config = {
                     'openai_api_key': api_key,
                     'openai_model': st.session_state.get('openai_model', 'gpt-4o-mini'),
                     'openai_temperature': 0.3,
-                    'enable_proxy': st.session_state.get('enable_proxy', False),
+                    'enable_proxy': st.session_state.get('enable_proxy', True),
                     'proxy_host': st.session_state.get('proxy_host', 'localhost'),
                     'proxy_port': st.session_state.get('proxy_port', 1080)
                 }
-                
+
                 llm = LLMIntegration(llm_config)
-                
+
                 # Создаем фиктивный execution_plan для анализа запросов
                 mock_execution_plan = {
                     'type': 'query_analysis',
                     'queries': analysis_data,
                     'prompt': prompt
                 }
-                
+
                 # Получаем ответ от LLM через правильный метод
                 async def get_async_recommendations():
                     return await llm.get_recommendations(
@@ -798,21 +799,22 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
                         execution_plan=mock_execution_plan,
                         db_schema=analysis_data
                     )
-                
+
                 # Запускаем асинхронную функцию
                 recommendations = asyncio.run(get_async_recommendations())
-                
-                # Отображаем результат
+
+                # Сохраняем результат в session_state
                 if recommendations:
-                    st.markdown("#### 🎯 Рекомендации по оптимизации запросов")
-                    _display_llm_analysis(recommendations)
+                    st.session_state['statistics_analysis'] = recommendations
                 else:
                     st.error("❌ Не удалось получить рекомендации от AI. Проверьте настройки API ключей и прокси.")
-                    
+
+                st.session_state['statistics_analyzed'] = True
+
             except Exception as e:
                 logger.error(f"Ошибка LLM анализа запросов: {e}")
                 error_msg = f"❌ Ошибка получения рекомендаций: {str(e)}"
-                
+
                 # Добавляем дополнительную информацию об ошибке
                 if "401" in str(e) or "unauthorized" in str(e).lower():
                     error_msg += "\n\n💡 **Проблема:** Неверный API ключ OpenAI"
@@ -834,8 +836,19 @@ def _show_llm_query_analysis(queries_df: pd.DataFrame):
                     error_msg += "\n- Проверьте API ключ OpenAI"
                     error_msg += "\n- Убедитесь, что прокси работает (если включен)"
                     error_msg += "\n- Проверьте интернет-соединение"
-                
+
                 st.error(error_msg)
+                st.session_state['statistics_analyzed'] = True
+
+    # Отображаем сохраненные рекомендации
+    if 'statistics_analysis' in st.session_state:
+        st.markdown("#### 🎯 Рекомендации по оптимизации запросов")
+        _display_llm_analysis(st.session_state['statistics_analysis'])
+
+    # Кнопка для повторного анализа
+    if st.button("🔄 Обновить анализ", help="Повторить AI анализ запросов"):
+        st.session_state['statistics_analyzed'] = False
+        st.rerun()
 
 
 def _display_llm_analysis(recommendations):
@@ -844,7 +857,7 @@ def _display_llm_analysis(recommendations):
         if not recommendations:
             st.error("❌ Не удалось получить рекомендации от AI")
             return
-        
+
         # Отображаем рекомендации
         for rec in recommendations:
             priority = rec.priority if hasattr(rec, 'priority') else 'средний'
@@ -853,27 +866,27 @@ def _display_llm_analysis(recommendations):
             expected_improvement = rec.expected_improvement if hasattr(rec, 'expected_improvement') else ''
             confidence = rec.confidence if hasattr(rec, 'confidence') else 0.5
             reasoning = rec.reasoning if hasattr(rec, 'reasoning') else ''
-            
+
             # Эмодзи для приоритета
             priority_emoji = "🔴" if priority == "высокий" else "🟡" if priority == "средний" else "🟢"
-            
+
             st.markdown(f"### {priority_emoji} {description}")
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.markdown(f"**Приоритет:** {priority}")
                 st.markdown(f"**Категория:** {category}")
             with col2:
                 st.markdown(f"**Уверенность:** {confidence:.1%}")
-            
+
             if reasoning:
                 st.markdown(f"**Объяснение:** {reasoning}")
-            
+
             if expected_improvement:
                 st.markdown(f"**Ожидаемое улучшение:** {expected_improvement}")
-            
+
             st.markdown("---")
-            
+
     except Exception as e:
         logger.error(f"Ошибка отображения LLM анализа: {e}")
         st.error(f"❌ Ошибка отображения анализа: {str(e)}")

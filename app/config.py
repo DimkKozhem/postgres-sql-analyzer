@@ -1,75 +1,76 @@
 """Конфигурация приложения PostgreSQL SQL Analyzer."""
 
+import os
 from typing import Dict, Any
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Настройки приложения."""
-    
+
     # Параметры PostgreSQL
     DEFAULT_WORK_MEM: int = 4  # MB
     DEFAULT_SHARED_BUFFERS: int = 128  # MB
     DEFAULT_EFFECTIVE_CACHE_SIZE: int = 4  # GB
-    
+
     # Пороги для анализа
     LARGE_TABLE_THRESHOLD: int = 1000000  # строк
     EXPENSIVE_QUERY_THRESHOLD: float = 1000.0  # cost
     SLOW_QUERY_THRESHOLD: float = 100.0  # ms
-    
+
     # Настройки анализа
     MAX_EXPLAIN_DEPTH: int = 10
     ENABLE_PG_STAT_STATEMENTS: bool = True
-    
+
     # Mock режим
     MOCK_MODE: bool = False
-    
+
     # Настройки базы данных
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5435
-    DB_NAME: str = "postgres"
-    DB_USER: str = "readonly_user"
-    DB_PASSWORD: str = "skripka_user"
-    
+    DB_HOST: str = os.getenv("DB_HOST", "localhost")
+    DB_PORT: int = int(os.getenv("DB_PORT", "5435"))
+    DB_NAME: str = os.getenv("DB_NAME", "postgres")
+    DB_USER: str = os.getenv("DB_USER", "readonly_user")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
+
     # LLM настройки
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4"
-    OPENAI_TEMPERATURE: float = 0.7
-    
-    ANTHROPIC_API_KEY: str = ""
-    ANTHROPIC_MODEL: str = "claude-3-sonnet"
-    
-    LOCAL_LLM_URL: str = ""
-    LOCAL_LLM_MODEL: str = "llama2"
-    
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4")
+    OPENAI_TEMPERATURE: float = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet")
+
+    LOCAL_LLM_URL: str = os.getenv("LOCAL_LLM_URL", "")
+    LOCAL_LLM_MODEL: str = os.getenv("LOCAL_LLM_MODEL", "llama2")
+
     # Настройки AI-рекомендаций
-    ENABLE_AI_RECOMMENDATIONS: bool = False
-    AI_PROVIDER: str = "auto"  # auto, openai, anthropic, local
-    AI_CONFIDENCE_THRESHOLD: float = 0.7
-    
+    ENABLE_AI_RECOMMENDATIONS: bool = os.getenv("ENABLE_AI_RECOMMENDATIONS", "false").lower() == "true"
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "auto")  # auto, openai, anthropic, local
+    AI_CONFIDENCE_THRESHOLD: float = float(os.getenv("AI_CONFIDENCE_THRESHOLD", "0.7"))
+
     # Настройки прокси для OpenAI
-    ENABLE_PROXY: bool = True
-    PROXY_HOST: str = "localhost"
-    PROXY_PORT: int = 1080
-    
+    ENABLE_PROXY: bool = os.getenv("ENABLE_PROXY", "false").lower() == "true"
+    PROXY_HOST: str = os.getenv("PROXY_HOST", "localhost")
+    PROXY_PORT: int = int(os.getenv("PROXY_PORT", "1080"))
+
     # SSH настройки для туннелирования
-    SSH_HOST: str = "193.246.150.18"
-    SSH_PORT: int = 22
-    SSH_USER: str = "skripka"
-    SSH_KEY_PATH: str = "~/.ssh/id_rsa"
-    AUTO_CREATE_SSH_TUNNEL: bool = False
-    SSH_TIMEOUT: int = 30
-    CHECK_DB_CONNECTION_ON_START: bool = True
-    
+    SSH_HOST: str = os.getenv("SSH_HOST", "")
+    SSH_PORT: int = int(os.getenv("SSH_PORT", "22"))
+    SSH_USER: str = os.getenv("SSH_USER", "")
+    SSH_KEY_PATH: str = os.getenv("SSH_KEY_PATH", "~/.ssh/id_rsa")
+    AUTO_CREATE_SSH_TUNNEL: bool = os.getenv("AUTO_CREATE_SSH_TUNNEL", "false").lower() == "true"
+    SSH_TIMEOUT: int = int(os.getenv("SSH_TIMEOUT", "30"))
+    CHECK_DB_CONNECTION_ON_START: bool = os.getenv("CHECK_DB_CONNECTION_ON_START", "true").lower() == "true"
+
     # Дополнительные пользователи для отладки
-    DB_SUPER_USER: str = "postgres"
-    DB_SUPER_PASSWORD: str = "skripka_super"
-    DB_ADMIN_USER: str = "admin_user"
-    DB_ADMIN_PASSWORD: str = "skripka_admin"
-    
+    DB_SUPER_USER: str = os.getenv("DB_SUPER_USER", "postgres")
+    DB_SUPER_PASSWORD: str = os.getenv("DB_SUPER_PASSWORD", "")
+    DB_ADMIN_USER: str = os.getenv("DB_ADMIN_USER", "admin_user")
+    DB_ADMIN_PASSWORD: str = os.getenv("DB_ADMIN_PASSWORD", "")
+
     # Brave API
-    BRAVE_API_KEY: str = ""
-    
+    BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
+
     model_config = {
         "env_prefix": "SQL_ANALYZER_",
         "env_file": ".env",

@@ -156,8 +156,8 @@ def retry_on_failure(
                     if attempt < max_retries - 1:
                         logger.warning(
                             f"Попытка {
-                                attempt +
-                                1} неудачна: {
+                                attempt
+                                + 1} неудачна: {
                                 str(e)}. Повтор через {delay}с...")
                         import time
                         time.sleep(delay)

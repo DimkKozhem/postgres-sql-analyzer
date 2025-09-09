@@ -51,22 +51,30 @@ class RecommendationEngine:
             Recommendation(
                 id="seq_scan_to_index",
                 title="Заменить последовательное сканирование на индексное",
-                description="Обнаружено последовательное сканирование таблицы. Создание индекса может значительно ускорить запрос.",
+                description=("Обнаружено последовательное сканирование таблицы. "
+                             "Создание индекса может значительно ускорить запрос."),
                 priority=Priority.HIGH,
                 category=Category.INDEX,
                 potential_improvement="10x-100x",
-                sql_example="-- Текущий запрос:\nSELECT * FROM users WHERE email = 'user@example.com';\n\n-- Рекомендуемый индекс:\nCREATE INDEX idx_users_email ON users(email);",
+                sql_example=("-- Текущий запрос:\n"
+                             "SELECT * FROM users WHERE email = 'user@example.com';\n\n"
+                             "-- Рекомендуемый индекс:\n"
+                             "CREATE INDEX idx_users_email ON users(email);"),
                 estimated_impact="Высокий - создание индекса по условию WHERE"
             ),
 
             Recommendation(
                 id="composite_index",
                 title="Создать составной индекс",
-                description="Запрос использует несколько условий WHERE. Составной индекс может улучшить производительность.",
+                description=("Запрос использует несколько условий WHERE. "
+                             "Составной индекс может улучшить производительность."),
                 priority=Priority.MEDIUM,
                 category=Category.INDEX,
                 potential_improvement="2x-10x",
-                sql_example="-- Текущий запрос:\nSELECT * FROM orders WHERE user_id = 123 AND status = 'pending';\n\n-- Рекомендуемый индекс:\nCREATE INDEX idx_orders_user_status ON orders(user_id, status);",
+                sql_example=("-- Текущий запрос:\n"
+                             "SELECT * FROM orders WHERE user_id = 123 AND status = 'pending';\n\n"
+                             "-- Рекомендуемый индекс:\n"
+                             "CREATE INDEX idx_orders_user_status ON orders(user_id, status);"),
                 estimated_impact="Средний - оптимизация составных условий"
             ),
 
@@ -74,22 +82,28 @@ class RecommendationEngine:
             Recommendation(
                 id="nested_loop_to_hash_join",
                 title="Оптимизировать вложенные циклы",
-                description="Обнаружены вложенные циклы для соединения таблиц. Добавление индексов или изменение порядка соединений может улучшить производительность.",
+                description=("Обнаружены вложенные циклы для соединения таблиц. "
+                             "Добавление индексов или изменение порядка соединений может "
+                             "улучшить производительность."),
                 priority=Priority.HIGH,
                 category=Category.JOIN,
                 potential_improvement="5x-50x",
-                sql_example="-- Добавить индекс для внешнего ключа:\nCREATE INDEX idx_orders_user_id ON orders(user_id);\n\n-- Или изменить порядок соединений в запросе",
+                sql_example=("-- Добавить индекс для внешнего ключа:\n"
+                             "CREATE INDEX idx_orders_user_id ON orders(user_id);\n\n"
+                             "-- Или изменить порядок соединений в запросе"),
                 estimated_impact="Высокий - оптимизация алгоритма соединения"
             ),
 
             Recommendation(
                 id="hash_join_optimization",
                 title="Оптимизировать хеш-соединения",
-                description="Хеш-соединения требуют значительной памяти. Увеличение work_mem может улучшить производительность.",
+                description=("Хеш-соединения требуют значительной памяти. "
+                            "Увеличение work_mem может улучшить производительность."),
                 priority=Priority.MEDIUM,
                 category=Category.JOIN,
                 potential_improvement="2x-5x",
-                configuration_example="-- Увеличить work_mem:\nSET work_mem = '64MB';  -- или больше в зависимости от размера данных",
+                configuration_example=("-- Увеличить work_mem:\nSET work_mem = '64MB';  "
+                                      "-- или больше в зависимости от размера данных"),
                 estimated_impact="Средний - оптимизация использования памяти"
             ),
 
@@ -97,7 +111,8 @@ class RecommendationEngine:
             Recommendation(
                 id="sort_optimization",
                 title="Оптимизировать операции сортировки",
-                description="Обнаружены операции сортировки. Увеличение work_mem или создание индексов может улучшить производительность.",
+                description=("Обнаружены операции сортировки. Увеличение work_mem или "
+                             "создание индексов может улучшить производительность."),
                 priority=Priority.MEDIUM,
                 category=Category.MEMORY,
                 potential_improvement="2x-10x",
@@ -109,7 +124,8 @@ class RecommendationEngine:
             Recommendation(
                 id="hash_aggregate_optimization",
                 title="Оптимизировать хеш-агрегацию",
-                description="Хеш-агрегация требует значительной памяти. Увеличение work_mem может улучшить производительность.",
+                description=("Хеш-агрегация требует значительной памяти. Увеличение work_mem "
+                             "может улучшить производительность."),
                 priority=Priority.MEDIUM,
                 category=Category.MEMORY,
                 potential_improvement="2x-5x",
@@ -121,22 +137,26 @@ class RecommendationEngine:
             Recommendation(
                 id="work_mem_optimization",
                 title="Оптимизировать work_mem",
-                description="Текущее значение work_mem может быть недостаточным для эффективного выполнения запроса.",
+                description=("Текущее значение work_mem может быть недостаточным для "
+                             "эффективного выполнения запроса."),
                 priority=Priority.LOW,
                 category=Category.CONFIGURATION,
                 potential_improvement="1.5x-3x",
-                configuration_example="-- Рекомендуемое значение work_mem:\nSET work_mem = '128MB';  -- для сложных запросов",
+                configuration_example=("-- Рекомендуемое значение work_mem:\n"
+                                       "SET work_mem = '128MB';  -- для сложных запросов"),
                 estimated_impact="Низкий - тонкая настройка параметров"
             ),
 
             Recommendation(
                 id="shared_buffers_optimization",
                 title="Оптимизировать shared_buffers",
-                description="Увеличение shared_buffers может улучшить кэширование и уменьшить I/O операции.",
+                description=("Увеличение shared_buffers может улучшить кэширование и "
+                             "уменьшить I/O операции."),
                 priority=Priority.LOW,
                 category=Category.CONFIGURATION,
                 potential_improvement="1.2x-2x",
-                configuration_example="-- Рекомендуемое значение shared_buffers:\nSET shared_buffers = '256MB';  -- 25% от доступной RAM",
+                configuration_example=("-- Рекомендуемое значение shared_buffers:\n"
+                                        "SET shared_buffers = '256MB';  -- 25% от доступной RAM"),
                 estimated_impact="Низкий - улучшение кэширования"
             ),
 
@@ -144,7 +164,8 @@ class RecommendationEngine:
             Recommendation(
                 id="limit_optimization",
                 title="Добавить LIMIT для ограничения результатов",
-                description="Запрос может возвращать большое количество строк. Добавление LIMIT может улучшить производительность.",
+                description=("Запрос может возвращать большое количество строк. "
+                             "Добавление LIMIT может улучшить производительность."),
                 priority=Priority.MEDIUM,
                 category=Category.QUERY_STRUCTURE,
                 potential_improvement="2x-10x",
@@ -155,11 +176,17 @@ class RecommendationEngine:
             Recommendation(
                 id="cte_optimization",
                 title="Оптимизировать CTE (Common Table Expressions)",
-                description="CTE могут быть неэффективными для больших наборов данных. Рассмотрите использование подзапросов или временных таблиц.",
+                description=("CTE могут быть неэффективными для больших наборов данных. "
+                             "Рассмотрите использование подзапросов или временных таблиц."),
                 priority=Priority.LOW,
                 category=Category.QUERY_STRUCTURE,
                 potential_improvement="1.5x-3x",
-                sql_example="-- Вместо CTE использовать подзапрос:\nSELECT * FROM (\n  SELECT user_id, COUNT(*) as order_count\n  FROM orders\n  GROUP BY user_id\n) user_stats WHERE order_count > 10;",
+                sql_example=("-- Вместо CTE использовать подзапрос:\n"
+                             "SELECT * FROM (\n"
+                             "  SELECT user_id, COUNT(*) as order_count\n"
+                             "  FROM orders\n"
+                             "  GROUP BY user_id\n"
+                             ") user_stats WHERE order_count > 10;"),
                 estimated_impact="Низкий - оптимизация структуры запроса"
             ),
 
@@ -167,7 +194,8 @@ class RecommendationEngine:
             Recommendation(
                 id="update_statistics",
                 title="Обновить статистику таблиц",
-                description="Статистика таблиц может быть устаревшей, что приводит к неоптимальным планам выполнения.",
+                description=("Статистика таблиц может быть устаревшей, что приводит к "
+                             "неоптимальным планам выполнения."),
                 priority=Priority.LOW,
                 category=Category.STATISTICS,
                 potential_improvement="1.2x-2x",

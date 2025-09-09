@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     """Класс для управления подключением к PostgreSQL."""
     
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str) -> None:
         self.dsn = dsn
         self._connection: Optional[connection] = None
     
@@ -48,7 +48,7 @@ class DatabaseConnection:
                     if not self._is_safe_query(sql):
                         raise ValueError("Запрос содержит небезопасные операции")
                     
-                    cur.execute("EXPLAIN (FORMAT JSON) " + sql)
+                    cur.execute("EXPLAIN (FORMAT JSON) %s", (sql,))
                     result = cur.fetchone()
                     
                     if result and 'QUERY PLAN' in result:

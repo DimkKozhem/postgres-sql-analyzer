@@ -3,7 +3,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,24 +11,24 @@ logger = logging.getLogger(__name__)
 def show_metrics_tab(dsn: str, mock_mode: bool = False):
     """Показать вкладку с метриками производительности."""
     st.markdown("## 📊 Метрики производительности")
-    
+
     if mock_mode:
         _show_mock_metrics()
         return
-    
+
     try:
         # Получаем метрики из базы данных
         metrics_data = _get_metrics_data(dsn)
-        
+
         if not metrics_data:
             st.warning("⚠️ Не удалось получить метрики из базы данных")
             return
-        
+
         # Отображаем метрики
         _show_system_metrics(metrics_data.get('system_metrics', {}))
         _show_query_metrics(metrics_data.get('query_metrics', []))
         _show_connection_metrics(metrics_data.get('connection_metrics', []))
-        
+
     except Exception as e:
         logger.error(f"Ошибка в show_metrics_tab: {e}")
         st.error(f"❌ Ошибка получения метрик: {e}")
@@ -38,12 +37,12 @@ def show_metrics_tab(dsn: str, mock_mode: bool = False):
 def _get_metrics_data(dsn: str) -> dict:
     """Получить метрики из базы данных."""
     import psycopg2
-    
+
     try:
         with psycopg2.connect(dsn) as conn:
             with conn.cursor() as cur:
                 metrics_data = {}
-                
+
                 # Проверяем доступность pg_stat_statements
                 cur.execute("""
                     SELECT EXISTS(
@@ -52,7 +51,7 @@ def _get_metrics_data(dsn: str) -> dict:
                     )
                 """)
                 has_pg_stat_statements = cur.fetchone()[0]
-                
+
                 if has_pg_stat_statements:
                     # Метрики запросов
                     cur.execute("""
@@ -71,7 +70,7 @@ def _get_metrics_data(dsn: str) -> dict:
                         LIMIT 50
                     """)
                     metrics_data['query_metrics'] = cur.fetchall()
-                
+
                 # Метрики подключений
                 cur.execute("""
                     SELECT 
@@ -82,7 +81,7 @@ def _get_metrics_data(dsn: str) -> dict:
                     GROUP BY state
                 """)
                 metrics_data['connection_metrics'] = cur.fetchall()
-                
+
                 # Системные метрики
                 cur.execute("""
                     SELECT 
@@ -101,9 +100,9 @@ def _get_metrics_data(dsn: str) -> dict:
                         'maintenance_work_mem': system_row[2],
                         'max_connections': system_row[3]
                     }
-                
+
                 return metrics_data
-                
+
     except Exception as e:
         logger.error(f"Ошибка получения метрик: {e}")
         return {}
@@ -113,20 +112,20 @@ def _show_system_metrics(system_metrics: dict):
     """Показать системные метрики."""
     if not system_metrics:
         return
-    
+
     st.markdown("### ⚙️ Системные параметры")
-    
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         st.metric("📦 Shared Buffers", system_metrics.get('shared_buffers', 'N/A'))
-    
+
     with col2:
         st.metric("💾 Work Memory", system_metrics.get('work_mem', 'N/A'))
-    
+
     with col3:
         st.metric("🔧 Maintenance Memory", system_metrics.get('maintenance_work_mem', 'N/A'))
-    
+
     with col4:
         st.metric("🔗 Max Connections", system_metrics.get('max_connections', 'N/A'))
 
@@ -136,42 +135,117 @@ def _show_query_metrics(query_metrics: list):
     if not query_metrics:
         st.info("ℹ️ Нет данных о запросах (pg_stat_statements не доступен)")
         return
-    
+
     st.markdown("### 📈 Метрики запросов")
-    
+
     # Создаем DataFrame
     columns = [
         'query', 'calls', 'total_exec_time', 'mean_exec_time', 'rows',
         'shared_blks_hit', 'shared_blks_read', 'temp_blks_written', 'local_blks_written'
     ]
-    
+
     df = pd.DataFrame(query_metrics, columns=columns)
-    
+
     # Добавляем вычисляемые колонки
     df['cache_hit_ratio'] = (df['shared_blks_hit'] / (df['shared_blks_hit'] + df['shared_blks_read'])).round(3)
     df['total_time_minutes'] = (df['total_exec_time'] / 60000).round(2)
-    
+
     # Показываем топ-10 запросов
     top_queries = df.head(10)
-    
+
     st.dataframe(
         top_queries[['query', 'calls', 'total_time_minutes', 'mean_exec_time', 'cache_hit_ratio']],
         width='stretch',
         hide_index=True
     )
-    
-    # График времени выполнения
+
+    # Улучшенный график топ-5 запросов
     if len(top_queries) > 0:
-        fig = px.bar(
-            top_queries.head(5),
-            x='mean_exec_time',
-            y='query',
-            orientation='h',
-            title="Топ-5 запросов по времени выполнения",
-            labels={'mean_exec_time': 'Среднее время (мс)', 'query': 'Запрос'}
+        top_5 = top_queries.head(5).copy()
+
+        # Сокращаем длинные запросы для лучшего отображения
+        top_5['query_short'] = top_5['query'].apply(
+            lambda x: x[:50] + '...' if len(x) > 50 else x
         )
-        fig.update_layout(height=400)
+
+        # Создаем красивый график
+        fig = px.bar(
+            top_5,
+            x='mean_exec_time',
+            y='query_short',
+            orientation='h',
+            title="🏆 Топ-5 запросов по времени выполнения",
+            labels={
+                'mean_exec_time': 'Среднее время выполнения (мс)',
+                'query_short': 'SQL запрос'
+            },
+            color='mean_exec_time',
+            color_continuous_scale='Reds',
+            hover_data={
+                'query': True,
+                'calls': True,
+                'total_time_minutes': True,
+                'cache_hit_ratio': True
+            }
+        )
+
+        # Улучшаем дизайн
+        fig.update_layout(
+            height=500,
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(size=12),
+            title_font_size=18,
+            title_x=0.5
+        )
+
+        # Настраиваем оси
+        fig.update_xaxes(
+            title_font_size=14,
+            gridcolor='rgba(128,128,128,0.2)',
+            showgrid=True
+        )
+        fig.update_yaxes(
+            title_font_size=14,
+            tickfont_size=10
+        )
+
+        # Добавляем аннотации с дополнительной информацией
+        for i, row in top_5.iterrows():
+            fig.add_annotation(
+                x=row['mean_exec_time'] + max(top_5['mean_exec_time']) * 0.02,
+                y=row['query_short'],
+                text=f"Вызовов: {row['calls']}<br>Кеш: {row['cache_hit_ratio']:.1%}",
+                showarrow=False,
+                font=dict(size=10, color='gray'),
+                bgcolor='rgba(255,255,255,0.8)',
+                bordercolor='gray',
+                borderwidth=1
+            )
+
         st.plotly_chart(fig, use_container_width=True)
+
+        # Дополнительная информация
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "🐌 Самый медленный запрос",
+                f"{top_5.iloc[0]['mean_exec_time']:.1f} мс",
+                f"{top_5.iloc[0]['calls']} вызовов"
+            )
+        with col2:
+            avg_time = top_5['mean_exec_time'].mean()
+            st.metric(
+                "📊 Среднее время топ-5",
+                f"{avg_time:.1f} мс"
+            )
+        with col3:
+            total_calls = top_5['calls'].sum()
+            st.metric(
+                "📈 Общее количество вызовов",
+                f"{total_calls:,}"
+            )
 
 
 def _show_connection_metrics(connection_metrics: list):
@@ -179,15 +253,15 @@ def _show_connection_metrics(connection_metrics: list):
     if not connection_metrics:
         st.info("ℹ️ Нет данных о подключениях")
         return
-    
+
     st.markdown("### 🔗 Статистика подключений")
-    
+
     # Создаем DataFrame
     df = pd.DataFrame(connection_metrics, columns=['state', 'count'])
-    
+
     # Показываем таблицу
     st.dataframe(df, width='stretch', hide_index=True)
-    
+
     # Круговая диаграмма
     if len(df) > 0:
         fig = px.pie(
@@ -202,26 +276,26 @@ def _show_connection_metrics(connection_metrics: list):
 def _show_mock_metrics():
     """Показать моковые метрики для демонстрации."""
     st.markdown("### 🎭 Демо-режим: Метрики производительности")
-    
+
     # Системные метрики
     st.markdown("#### ⚙️ Системные параметры")
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         st.metric("📦 Shared Buffers", "128MB")
-    
+
     with col2:
         st.metric("💾 Work Memory", "4MB")
-    
+
     with col3:
         st.metric("🔧 Maintenance Memory", "64MB")
-    
+
     with col4:
         st.metric("🔗 Max Connections", "100")
-    
+
     # Метрики запросов
     st.markdown("#### 📈 Метрики запросов")
-    
+
     mock_queries = pd.DataFrame({
         'query': [
             'SELECT * FROM users WHERE id = $1',
@@ -235,9 +309,9 @@ def _show_mock_metrics():
         'mean_exec_time': [10.0, 10.0, 10.0, 10.0, 10.0],
         'cache_hit_ratio': [0.95, 0.87, 0.92, 0.89, 0.91]
     })
-    
+
     st.dataframe(mock_queries, width='stretch', hide_index=True)
-    
+
     # График
     fig = px.bar(
         mock_queries,
@@ -249,17 +323,17 @@ def _show_mock_metrics():
     )
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
-    
+
     # Статистика подключений
     st.markdown("#### 🔗 Статистика подключений")
-    
+
     mock_connections = pd.DataFrame({
         'state': ['active', 'idle', 'idle in transaction', 'disabled'],
         'count': [5, 12, 3, 1]
     })
-    
+
     st.dataframe(mock_connections, width='stretch', hide_index=True)
-    
+
     # Круговая диаграмма
     fig = px.pie(
         mock_connections,

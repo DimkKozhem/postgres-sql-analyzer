@@ -431,13 +431,16 @@ ORDER BY
 """
 }
 
+
 def get_complex_examples():
     """Возвращает словарь сложных примеров SQL запросов."""
     return COMPLEX_SQL_EXAMPLES
 
+
 def get_example_by_name(name: str) -> str:
     """Возвращает конкретный пример по имени."""
     return COMPLEX_SQL_EXAMPLES.get(name, "")
+
 
 def get_all_example_names() -> list:
     """Возвращает список всех доступных примеров."""

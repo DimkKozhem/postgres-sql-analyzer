@@ -4,12 +4,32 @@
 
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import requests
 
+# Настройка SOCKS5 прокси по умолчанию
+# Прокси будет настроен динамически в зависимости от настроек пользователя
+
 logger = logging.getLogger(__name__)
+
+
+def setup_proxy_environment(enable_proxy: bool = True, proxy_host: str = "localhost", proxy_port: int = 1080) -> None:
+    """Настраивает переменные окружения для прокси."""
+    if enable_proxy:
+        proxy_url = f"socks5://{proxy_host}:{proxy_port}"
+        os.environ['HTTP_PROXY'] = proxy_url
+        os.environ['HTTPS_PROXY'] = proxy_url
+        os.environ['ALL_PROXY'] = proxy_url
+        logger.info(f"Настроен SOCKS5 прокси: {proxy_url}")
+    else:
+        # Очищаем переменные прокси
+        for key in ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']:
+            if key in os.environ:
+                del os.environ[key]
+        logger.info("Прокси отключен")
 
 
 @dataclass
@@ -27,7 +47,7 @@ class LLMRecommendation:
     confidence: float = 0.0
     additional_suggestions: List[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.additional_suggestions is None:
             self.additional_suggestions = []
 
@@ -88,7 +108,7 @@ class OpenAIProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка получения рекомендаций от OpenAI: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     async def analyze_database_schema(
             self, schema: Dict) -> List[LLMRecommendation]:
@@ -198,8 +218,7 @@ class OpenAIProvider(LLMProvider):
 
     async def _call_openai_api(self, prompt: str) -> str:
         """Вызов OpenAI API."""
-        import os
-        
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -208,7 +227,12 @@ class OpenAIProvider(LLMProvider):
         data = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "Ты - эксперт по PostgreSQL. Отвечай только в указанном формате. НЕ добавляй лишних заголовков типа '## 🤖 AI Рекомендации'. Начинай сразу с '### Название рекомендации.'"},
+                {
+                    "role": "system",
+                    "content": ("Ты - эксперт по PostgreSQL. Отвечай только в указанном формате. "
+                                "НЕ добавляй лишних заголовков типа '## 🤖 AI Рекомендации'. "
+                                "Начинай сразу с '### Название рекомендации.'")
+                },
                 {"role": "user", "content": prompt}
             ],
             "temperature": self.temperature,
@@ -222,7 +246,7 @@ class OpenAIProvider(LLMProvider):
                 import httpx
                 proxy_url = f"socks5://{self.proxy_host}:{self.proxy_port}"
                 logger.info(f"Используется SOCKS5 прокси: {proxy_url}")
-                
+
                 async with httpx.AsyncClient(proxy=proxy_url, timeout=30.0) as client:
                     response = await client.post(
                         f"{self.base_url}/chat/completions",
@@ -231,7 +255,7 @@ class OpenAIProvider(LLMProvider):
                     )
                     response.raise_for_status()
                     return response.json()["choices"][0]["message"]["content"]
-                    
+
             except ImportError:
                 logger.warning("httpx не установлен, используем requests без SOCKS5")
                 # Fallback к requests без прокси
@@ -245,15 +269,8 @@ class OpenAIProvider(LLMProvider):
                 return response.json()["choices"][0]["message"]["content"]
             except Exception as e:
                 logger.error(f"Ошибка при использовании прокси: {e}")
-                # Fallback к requests без прокси
-                response = requests.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=data,
-                    timeout=30
-                )
-                response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
+                # Возвращаем fallback рекомендацию
+                return self._get_fallback_recommendation()
         else:
             # Прямое подключение без прокси
             response = requests.post(
@@ -291,7 +308,7 @@ class OpenAIProvider(LLMProvider):
         except json.JSONDecodeError:
             # Если не JSON, пробуем извлечь JSON из текста
             logger.info("OpenAI вернул текстовый ответ, пробуем извлечь JSON")
-            
+
             # Ищем JSON блок в тексте
             import re
             json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
@@ -318,7 +335,7 @@ class OpenAIProvider(LLMProvider):
                     return recommendations
                 except Exception as e:
                     logger.error(f"Ошибка парсинга JSON из текста: {e}")
-            
+
             # Если не удалось извлечь JSON, создаем рекомендацию из текстового ответа
             recommendation = LLMRecommendation(
                 priority="medium",
@@ -335,7 +352,7 @@ class OpenAIProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций OpenAI: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _parse_schema_recommendations(
             self, response: str) -> List[LLMRecommendation]:
@@ -360,7 +377,7 @@ class OpenAIProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций по схеме: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _extract_optimized_query(self, response: str) -> str:
         """Извлечение оптимизированного запроса из ответа."""
@@ -567,7 +584,7 @@ class AnthropicProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций Anthropic: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _parse_schema_recommendations(
             self, response: str) -> List[LLMRecommendation]:
@@ -592,7 +609,7 @@ class AnthropicProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций по схеме: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _extract_optimized_query(self, response: str) -> str:
         """Извлечение оптимизированного запроса из ответа."""
@@ -806,7 +823,7 @@ class LocalLLMProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций локальной LLM: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _parse_schema_recommendations(
             self, response: str) -> List[LLMRecommendation]:
@@ -831,7 +848,7 @@ class LocalLLMProvider(LLMProvider):
 
         except Exception as e:
             logger.error(f"Ошибка парсинга рекомендаций по схеме: {e}")
-            return []
+            return [self._get_fallback_recommendation()]
 
     def _extract_optimized_query(self, response: str) -> str:
         """Извлечение оптимизированного запроса из ответа."""
@@ -851,6 +868,13 @@ class LLMIntegration:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.providers = {}
+        
+        # Настраиваем прокси при инициализации
+        enable_proxy = config.get('enable_proxy', True)
+        proxy_host = config.get('proxy_host', 'localhost')
+        proxy_port = config.get('proxy_port', 1080)
+        setup_proxy_environment(enable_proxy, proxy_host, proxy_port)
+        
         self._initialize_providers()
 
     def _initialize_providers(self):
@@ -964,13 +988,13 @@ class LLMIntegration:
             if not self.providers:
                 logger.error("Нет доступных LLM провайдеров")
                 return ""
-            
+
             # Используем первый доступный провайдер
             provider_name = list(self.providers.keys())[0]
             provider = self.providers[provider_name]
-            
+
             logger.info(f"Анализ производительности запросов с помощью {provider_name}")
-            
+
             # Вызываем LLM через правильный метод
             if provider_name == "openai":
                 response = await provider._call_openai_api(prompt)
@@ -981,14 +1005,36 @@ class LLMIntegration:
             else:
                 logger.error(f"Неизвестный провайдер: {provider_name}")
                 return ""
-            
+
             if response:
                 logger.info("Успешно получен анализ производительности запросов")
                 return response
             else:
                 logger.warning("Пустой ответ от LLM при анализе производительности")
                 return ""
-                
+
         except Exception as e:
             logger.error(f"Ошибка анализа производительности запросов: {e}")
             return ""
+
+    def _get_fallback_recommendation(self) -> LLMRecommendation:
+        """Возвращает базовую рекомендацию при ошибке LLM."""
+        return LLMRecommendation(
+            type="fallback_recommendation",
+            priority="medium",
+            category="general",
+            description="Общие рекомендации по оптимизации PostgreSQL",
+            current_query="",
+            optimized_query="",
+            expected_improvement="Улучшение производительности запросов",
+            reasoning=("AI анализ временно недоступен. Рекомендуется проверить индексы, "
+                       "статистики таблиц и настройки PostgreSQL."),
+            llm_model="fallback",
+            confidence=0.5,
+            additional_suggestions=[
+                "Проверьте наличие индексов для часто используемых условий WHERE",
+                "Обновите статистики таблиц командой ANALYZE",
+                "Рассмотрите увеличение work_mem для сложных запросов",
+                "Проверьте настройки shared_buffers и effective_cache_size"
+            ]
+        )

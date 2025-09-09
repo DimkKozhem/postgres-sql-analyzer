@@ -5,7 +5,7 @@ import subprocess
 import time
 import logging
 import socket
-from typing import Optional, Tuple
+from typing import Optional
 from contextlib import contextmanager
 
 from app.config import settings
@@ -50,13 +50,13 @@ def _kill_process_on_port(port: int) -> bool:
 class SSHTunnel:
     """Класс для управления SSH туннелями."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.tunnel_process: Optional[subprocess.Popen] = None
         self.local_port: Optional[int] = None
     
-    def create_tunnel(self, remote_host: str, remote_port: int, 
-                     local_port: int, ssh_host: str, ssh_user: str, 
-                     ssh_key_path: str) -> bool:
+    def create_tunnel(self, remote_host: str, remote_port: int,
+                      local_port: int, ssh_host: str, ssh_user: str,
+                      ssh_key_path: str) -> bool:
         """Создает SSH туннель."""
         try:
             # Расширяем путь к SSH ключу
@@ -72,8 +72,8 @@ class SSHTunnel:
                 'ssh',
                 '-N',  # Не выполнять удаленные команды
                 '-L', f'{local_port}:{remote_host}:{remote_port}',  # Локальный порт -> удаленный хост:порт
-                '-o', 'StrictHostKeyChecking=no',  # Не проверять host key
-                '-o', 'UserKnownHostsFile=/dev/null',  # Не сохранять host key
+                '-o', 'StrictHostKeyChecking=yes',  # Проверять host key для безопасности
+                '-o', 'UserKnownHostsFile=~/.ssh/known_hosts',  # Сохранять host key
                 '-o', 'ServerAliveInterval=60',  # Keep-alive
                 '-o', 'ServerAliveCountMax=3',  # Максимум попыток keep-alive
                 '-i', ssh_key_path,  # Путь к приватному ключу
@@ -117,7 +117,7 @@ class SSHTunnel:
             logger.error(f"Ошибка при создании SSH туннеля: {e}")
             return False
     
-    def close_tunnel(self):
+    def close_tunnel(self) -> None:
         """Закрывает SSH туннель."""
         if self.tunnel_process and self.tunnel_process.poll() is None:
             logger.info("Закрытие SSH туннеля")
@@ -132,7 +132,7 @@ class SSHTunnel:
     
     def is_tunnel_active(self) -> bool:
         """Проверяет, активен ли туннель."""
-        return (self.tunnel_process is not None and 
+        return (self.tunnel_process is not None and
                 self.tunnel_process.poll() is None)
     
     def get_local_port(self) -> Optional[int]:
@@ -205,8 +205,8 @@ def test_ssh_connection() -> bool:
         cmd = [
             'ssh',
             '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=~/.ssh/known_hosts',
             '-i', ssh_key_path,
             f'{settings.SSH_USER}@{settings.SSH_HOST}',
             'echo "SSH connection test successful"'

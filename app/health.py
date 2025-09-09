@@ -35,23 +35,23 @@ class SystemMetrics:
 
 class HealthChecker:
     """Основной класс для проверки здоровья приложения."""
-    
+
     def __init__(self):
         self.start_time = time.time()
         self.checks = []
-    
+
     async def check_database_connection(self, dsn: str = None) -> HealthStatus:
         """Проверяет подключение к базе данных."""
         start_time = time.time()
-        
+
         try:
             if dsn:
                 from app.analyzer import SQLAnalyzer
                 analyzer = SQLAnalyzer(dsn, mock_mode=False)
                 # Простая проверка подключения
-                test_result = analyzer.analyze_sql("SELECT 1 as health_check;")
+                _ = analyzer.analyze_sql("SELECT 1 as health_check;")
                 response_time = time.time() - start_time
-                
+
                 return HealthStatus(
                     name="database_connection",
                     status="healthy",
@@ -68,7 +68,7 @@ class HealthChecker:
                     timestamp=datetime.now(),
                     response_time=0.0
                 )
-                
+
         except Exception as e:
             response_time = time.time() - start_time
             return HealthStatus(
@@ -79,11 +79,11 @@ class HealthChecker:
                 response_time=response_time,
                 details={"error": str(e)}
             )
-    
+
     async def check_llm_providers(self, config: Dict[str, Any]) -> List[HealthStatus]:
         """Проверяет доступность LLM провайдеров."""
         checks = []
-        
+
         # OpenAI
         if config.get("openai_api_key"):
             start_time = time.time()
@@ -92,7 +92,7 @@ class HealthChecker:
                 openai.api_key = config["openai_api_key"]
                 models = openai.Model.list()
                 response_time = time.time() - start_time
-                
+
                 checks.append(HealthStatus(
                     name="openai_provider",
                     status="healthy",
@@ -111,7 +111,7 @@ class HealthChecker:
                     response_time=response_time,
                     details={"error": str(e)}
                 ))
-        
+
         # Anthropic
         if config.get("anthropic_api_key"):
             start_time = time.time()
@@ -123,7 +123,7 @@ class HealthChecker:
                     timeout=10
                 )
                 response_time = time.time() - start_time
-                
+
                 if response.status_code == 200:
                     checks.append(HealthStatus(
                         name="anthropic_provider",
@@ -152,7 +152,7 @@ class HealthChecker:
                     response_time=response_time,
                     details={"error": str(e)}
                 ))
-        
+
         # Local LLM
         if config.get("local_llm_url"):
             start_time = time.time()
@@ -163,7 +163,7 @@ class HealthChecker:
                     timeout=10
                 )
                 response_time = time.time() - start_time
-                
+
                 if response.status_code == 200:
                     checks.append(HealthStatus(
                         name="local_llm_provider",
@@ -192,9 +192,9 @@ class HealthChecker:
                     response_time=response_time,
                     details={"error": str(e)}
                 ))
-        
+
         return checks
-    
+
     def get_system_metrics(self) -> SystemMetrics:
         """Получает системные метрики."""
         try:
@@ -202,7 +202,7 @@ class HealthChecker:
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
             network = psutil.net_io_counters()
-            
+
             return SystemMetrics(
                 cpu_percent=cpu_percent,
                 memory_percent=memory.percent,
@@ -215,7 +215,7 @@ class HealthChecker:
                 },
                 timestamp=datetime.now()
             )
-        except Exception as e:
+        except Exception:
             # Fallback если psutil недоступен
             return SystemMetrics(
                 cpu_percent=0.0,
@@ -224,39 +224,39 @@ class HealthChecker:
                 network_io={},
                 timestamp=datetime.now()
             )
-    
+
     def get_uptime(self) -> float:
         """Возвращает время работы приложения."""
         return time.time() - self.start_time
-    
+
     async def run_all_checks(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Выполняет все проверки здоровья."""
         start_time = time.time()
-        
+
         # Системные метрики
         system_metrics = self.get_system_metrics()
-        
+
         # Проверки
         checks = []
-        
+
         # Проверка БД
         db_check = await self.check_database_connection(config.get("dsn") if config else None)
         checks.append(db_check)
-        
+
         # Проверка LLM провайдеров
         if config:
             llm_checks = await self.check_llm_providers(config)
             checks.extend(llm_checks)
-        
+
         # Общий статус
         overall_status = "healthy"
         if any(check.status == "unhealthy" for check in checks):
             overall_status = "unhealthy"
         elif any(check.status == "degraded" for check in checks):
             overall_status = "degraded"
-        
+
         total_time = time.time() - start_time
-        
+
         return {
             "status": overall_status,
             "timestamp": datetime.now().isoformat(),

@@ -3,7 +3,7 @@
 import streamlit as st
 import logging
 from typing import Tuple
-from app.utils import ui, validator
+from app.utils import validator
 
 logger = logging.getLogger(__name__)
 
@@ -307,14 +307,14 @@ def show_connection_status(dsn: str) -> Tuple[bool, str]:
     try:
         # Тестируем подключение
         connection_success, connection_message = validator.validate_database_connection(dsn)
-        
+
         if connection_success:
             st.success("✅ Подключение к БД активно")
             return True, "Подключено"
         else:
             st.error(f"❌ {connection_message}")
             return False, connection_message
-            
+
     except Exception as e:
         error_message = f"Ошибка проверки подключения: {str(e)}"
         st.error(f"❌ {error_message}")

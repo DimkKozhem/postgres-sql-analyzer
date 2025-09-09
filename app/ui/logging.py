@@ -12,24 +12,24 @@ logger = logging.getLogger(__name__)
 def show_logging_tab(dsn: str, mock_mode: bool = False):
     """Показать вкладку с логами и мониторингом."""
     st.markdown("## 📋 Логи и мониторинг")
-    
+
     if mock_mode:
         _show_mock_logging()
         return
-    
+
     try:
         # Получаем данные логов
         log_data = _get_log_data(dsn)
-        
+
         if not log_data:
             st.warning("⚠️ Не удалось получить данные логов")
             return
-        
+
         # Отображаем различные типы логов
         _show_error_logs(log_data.get('error_logs', []))
         _show_slow_queries(log_data.get('slow_queries', []))
         _show_connection_logs(log_data.get('connection_logs', []))
-        
+
     except Exception as e:
         logger.error(f"Ошибка в show_logging_tab: {e}")
         st.error(f"❌ Ошибка получения логов: {e}")
@@ -38,12 +38,12 @@ def show_logging_tab(dsn: str, mock_mode: bool = False):
 def _get_log_data(dsn: str) -> dict:
     """Получить данные логов из базы данных."""
     import psycopg2
-    
+
     try:
         with psycopg2.connect(dsn) as conn:
             with conn.cursor() as cur:
                 log_data = {}
-                
+
                 # Проверяем доступность pg_stat_statements
                 cur.execute("""
                     SELECT EXISTS(
@@ -52,7 +52,7 @@ def _get_log_data(dsn: str) -> dict:
                     )
                 """)
                 has_pg_stat_statements = cur.fetchone()[0]
-                
+
                 if has_pg_stat_statements:
                     # Медленные запросы (запросы с временем выполнения > 1000ms)
                     cur.execute("""
@@ -70,7 +70,7 @@ def _get_log_data(dsn: str) -> dict:
                         LIMIT 20
                     """)
                     log_data['slow_queries'] = cur.fetchall()
-                
+
                 # Активные подключения
                 cur.execute("""
                     SELECT 
@@ -88,7 +88,7 @@ def _get_log_data(dsn: str) -> dict:
                     LIMIT 50
                 """)
                 log_data['connection_logs'] = cur.fetchall()
-                
+
                 # Системные события (если доступны)
                 try:
                     cur.execute("""
@@ -99,11 +99,12 @@ def _get_log_data(dsn: str) -> dict:
                         LIMIT 1
                     """)
                     log_data['error_logs'] = cur.fetchall()
-                except:
+                except Exception as e:
                     log_data['error_logs'] = []
-                
+                    logger.warning(f"Ошибка чтения error.log: {e}")
+
                 return log_data
-                
+
     except Exception as e:
         logger.error(f"Ошибка получения логов: {e}")
         return {}
@@ -112,15 +113,15 @@ def _get_log_data(dsn: str) -> dict:
 def _show_error_logs(error_logs: list):
     """Показать логи ошибок."""
     st.markdown("### ❌ Логи ошибок")
-    
+
     if not error_logs:
         st.info("ℹ️ Нет записей об ошибках")
         return
-    
+
     # Создаем DataFrame
     columns = ['event_type', 'event_time', 'message']
     df = pd.DataFrame(error_logs, columns=columns)
-    
+
     # Показываем таблицу
     st.dataframe(df, width='stretch', hide_index=True)
 
@@ -128,30 +129,30 @@ def _show_error_logs(error_logs: list):
 def _show_slow_queries(slow_queries: list):
     """Показать медленные запросы."""
     st.markdown("### 🐌 Медленные запросы")
-    
+
     if not slow_queries:
         st.info("ℹ️ Нет медленных запросов (время выполнения > 1000ms)")
         return
-    
+
     # Создаем DataFrame
     columns = [
         'query', 'calls', 'total_exec_time', 'mean_exec_time', 'rows',
         'shared_blks_hit', 'shared_blks_read'
     ]
-    
+
     df = pd.DataFrame(slow_queries, columns=columns)
-    
+
     # Добавляем вычисляемые колонки
     df['cache_hit_ratio'] = (df['shared_blks_hit'] / (df['shared_blks_hit'] + df['shared_blks_read'])).round(3)
     df['total_time_minutes'] = (df['total_exec_time'] / 60000).round(2)
-    
+
     # Сокращаем длинные запросы для отображения
     df['query_short'] = df['query'].str[:100] + '...'
-    
+
     # Показываем таблицу
     display_columns = ['query_short', 'calls', 'mean_exec_time', 'total_time_minutes', 'cache_hit_ratio']
     st.dataframe(df[display_columns], width='stretch', hide_index=True)
-    
+
     # График времени выполнения
     if len(df) > 0:
         fig = px.bar(
@@ -169,46 +170,46 @@ def _show_slow_queries(slow_queries: list):
 def _show_connection_logs(connection_logs: list):
     """Показать логи подключений."""
     st.markdown("### 🔗 Логи подключений")
-    
+
     if not connection_logs:
         st.info("ℹ️ Нет данных о подключениях")
         return
-    
+
     # Создаем DataFrame
     columns = [
-        'pid', 'usename', 'application_name', 'client_addr', 
+        'pid', 'usename', 'application_name', 'client_addr',
         'state', 'query_start', 'state_change', 'query'
     ]
-    
+
     df = pd.DataFrame(connection_logs, columns=columns)
-    
+
     # Обрабатываем время
     if not df.empty and 'query_start' in df.columns:
         # Исправляем ошибку timezone - приводим к naive datetime
         current_time = datetime.now()
         query_start_times = pd.to_datetime(df['query_start'], utc=True).dt.tz_localize(None)
         df['duration'] = (current_time - query_start_times).dt.total_seconds().round(1)
-    
+
     # Сокращаем длинные запросы
     if 'query' in df.columns:
         df['query_short'] = df['query'].str[:80] + '...'
-    
+
     # Показываем таблицу
     display_columns = ['pid', 'usename', 'state', 'duration', 'query_short']
     available_columns = [col for col in display_columns if col in df.columns]
-    
+
     st.dataframe(df[available_columns], width='stretch', hide_index=True)
-    
+
     # Статистика по состояниям
     if 'state' in df.columns:
         state_counts = df['state'].value_counts()
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
             st.markdown("#### 📊 Распределение по состояниям")
             st.dataframe(state_counts.reset_index(), width='stretch', hide_index=True)
-        
+
         with col2:
             # Круговая диаграмма
             fig = px.pie(
@@ -222,10 +223,10 @@ def _show_connection_logs(connection_logs: list):
 def _show_mock_logging():
     """Показать моковые логи для демонстрации."""
     st.markdown("### 🎭 Демо-режим: Логи и мониторинг")
-    
+
     # Медленные запросы
     st.markdown("#### 🐌 Медленные запросы")
-    
+
     mock_slow_queries = pd.DataFrame({
         'query': [
             'SELECT * FROM large_table WHERE complex_condition = $1',
@@ -239,9 +240,9 @@ def _show_mock_logging():
         'total_time_minutes': [1.04, 0.45, 0.20, 0.10, 0.05],
         'cache_hit_ratio': [0.85, 0.78, 0.92, 0.88, 0.95]
     })
-    
+
     st.dataframe(mock_slow_queries, width='stretch', hide_index=True)
-    
+
     # График медленных запросов
     fig = px.bar(
         mock_slow_queries,
@@ -253,10 +254,10 @@ def _show_mock_logging():
     )
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
-    
+
     # Логи подключений
     st.markdown("#### 🔗 Активные подключения")
-    
+
     mock_connections = pd.DataFrame({
         'pid': [12345, 12346, 12347, 12348, 12349],
         'usename': ['app_user', 'admin', 'app_user', 'readonly_user', 'app_user'],
@@ -270,17 +271,17 @@ def _show_mock_logging():
             'INSERT INTO sessions VALUES ($1, $2)'
         ]
     })
-    
+
     st.dataframe(mock_connections, width='stretch', hide_index=True)
-    
+
     # Статистика по состояниям
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.markdown("#### 📊 Распределение по состояниям")
         state_counts = mock_connections['state'].value_counts()
         st.dataframe(state_counts.reset_index(), width='stretch', hide_index=True)
-    
+
     with col2:
         # Круговая диаграмма
         fig = px.pie(
@@ -289,10 +290,10 @@ def _show_mock_logging():
             title="Состояния подключений"
         )
         st.plotly_chart(fig, use_container_width=True)
-    
+
     # Логи ошибок
     st.markdown("#### ❌ Последние события")
-    
+
     mock_events = pd.DataFrame({
         'event_type': ['connection', 'query', 'error', 'connection', 'query'],
         'event_time': [
@@ -310,5 +311,5 @@ def _show_mock_logging():
             'Query completed successfully'
         ]
     })
-    
+
     st.dataframe(mock_events, width='stretch', hide_index=True)

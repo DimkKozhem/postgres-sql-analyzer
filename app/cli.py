@@ -213,7 +213,7 @@ def test(dsn: str, **config_options):
                 result = analyzer.analyze_sql(example['sql'], custom_config)
 
                 if result.is_valid:
-                    click.echo(f"  ✅ Успешно")
+                    click.echo("  ✅ Успешно")
                     if result.metrics:
                         click.echo(
                             f"     Время: {
